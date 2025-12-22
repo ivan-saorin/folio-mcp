@@ -260,6 +260,43 @@ mod tests {
         }
 
         #[test]
+        fn test_phi_identity() {
+            // Test that phi^2 - phi - 1 ≈ 0 (the defining property of phi)
+            // Using low precision (15) which uses the fast f64 path
+            let five = Number::from_i64(5);
+            let sqrt5 = five.sqrt(15).unwrap();
+            let one = Number::from_i64(1);
+            let two = Number::from_i64(2);
+
+            let phi = one.add(&sqrt5).checked_div(&two).unwrap();
+            let phi_squared = phi.mul(&phi);
+            let identity = phi_squared.sub(&phi).sub(&one);
+
+            // Should be very small (close to 0) - with f64 approximation this is near machine epsilon
+            let result = identity.as_decimal(20);
+            assert!(result.parse::<f64>().map(|f| f.abs() < 1e-10).unwrap_or(false),
+                "phi^2 - phi - 1 should be ~0, got: {}", result);
+        }
+
+        #[test]
+        fn test_phi_identity_high_precision() {
+            // Test with higher precision (50) using Newton-Raphson
+            let five = Number::from_i64(5);
+            let sqrt5 = five.sqrt(50).unwrap();
+            let one = Number::from_i64(1);
+            let two = Number::from_i64(2);
+
+            let phi = one.add(&sqrt5).checked_div(&two).unwrap();
+            let phi_squared = phi.mul(&phi);
+            let identity = phi_squared.sub(&phi).sub(&one);
+
+            // With improved to_f64, this should now work even for huge BigRationals
+            let result_str = identity.as_decimal(20);
+            let f: f64 = result_str.parse().expect("should be able to parse to f64");
+            assert!(f.abs() < 1e-10, "phi^2 - phi - 1 should be ~0, got: {}", f);
+        }
+
+        #[test]
         fn test_pi() {
             let pi = Number::pi(50);
             let decimal = pi.as_decimal(5);

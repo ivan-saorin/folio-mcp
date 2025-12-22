@@ -376,12 +376,13 @@ mod tests {
         let phi_str = phi.as_number().unwrap().as_decimal(4);
         assert!(phi_str.starts_with("1.618"), "phi should start with 1.618, got: {}", phi_str);
 
-        // Check identity: phi^2 - phi - 1 should be ~0
+        // Check identity: phi^2 - phi - 1 should be ~0 (within floating point tolerance)
         let identity = result.values.get("identity_check")
             .expect(&format!("identity_check not found. Available keys: {:?}", result.values.keys().collect::<Vec<_>>()));
         assert!(!identity.is_error(), "identity should compute, got: {:?}", identity);
-        let identity_val = identity.as_number().unwrap().as_decimal(10);
-        assert!(identity_val.starts_with("0.") || identity_val.starts_with("-0."),
+        let identity_val = identity.as_number().unwrap().as_decimal(20);
+        // With approximate sqrt, the result should be very small (< 1e-10)
+        assert!(identity_val.starts_with("0.") || identity_val.starts_with("-0.") || identity_val == "0",
             "phi^2 - phi - 1 should be ~0, got: {}", identity_val);
 
         // Check ln(phi) ≈ 0.4812

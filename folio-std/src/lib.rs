@@ -27,9 +27,25 @@ pub fn load_standard_library(registry: PluginRegistry) -> PluginRegistry {
         .with_analyzer(analyzers::EAnalyzer)
         .with_command(commands::Trace)
         .with_command(commands::Explain)
+        // Mathematical constants
         .with_constant(constants::phi())
         .with_constant(constants::pi())
         .with_constant(constants::e())
+        .with_constant(constants::sqrt2())
+        .with_constant(constants::sqrt3())
+        // Particle masses (MeV)
+        .with_constant(constants::m_e())
+        .with_constant(constants::m_mu())
+        .with_constant(constants::m_tau())
+        .with_constant(constants::m_higgs())
+        // CKM matrix elements
+        .with_constant(constants::v_us())
+        .with_constant(constants::v_cb())
+        .with_constant(constants::v_ub())
+        .with_constant(constants::v_ts())
+        // Physical constants
+        .with_constant(constants::c())
+        .with_constant(constants::alpha())
 }
 
 /// Create registry with standard library

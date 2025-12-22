@@ -212,6 +212,17 @@ impl Number {
             }
         }
 
+        // Fast path: use f64 for low precision (up to ~15 digits)
+        if precision <= 15 {
+            if let Some(f) = self.to_f64() {
+                let s = f.sqrt();
+                if s.is_finite() && s > 0.0 {
+                    return Self::from_str(&format!("{:.15}", s))
+                        .map_err(|_| NumberError::DomainError("sqrt conversion failed".to_string()));
+                }
+            }
+        }
+
         // Newton-Raphson: x_{n+1} = (x_n + S/x_n) / 2
         // Start with f64 approximation as initial guess
         let two = BigRational::from(BigInt::from(2));
@@ -232,8 +243,8 @@ impl Number {
 
         // Number of iterations: Newton-Raphson doubles precision each iteration
         // Start with ~15 digits from f64, need ceil(log2(precision/15)) more iterations
-        // Add a few extra for safety
-        let iterations = ((precision as f64 / 15.0).log2().ceil() as u32 + 3).max(5);
+        // Cap at reasonable number for performance
+        let iterations = ((precision as f64 / 15.0).log2().ceil() as u32 + 2).max(3).min(10);
 
         for _ in 0..iterations {
             // x = (x + self/x) / 2
@@ -249,6 +260,19 @@ impl Number {
     pub fn ln(&self, precision: u32) -> Result<Self, NumberError> {
         if self.inner <= BigRational::zero() {
             return Err(NumberError::DomainError("logarithm of non-positive number".to_string()));
+        }
+
+        // Fast path: use f64 for low precision (up to ~15 digits)
+        if precision <= 15 {
+            if let Some(f) = self.to_f64() {
+                if f > 0.0 {
+                    let result = f.ln();
+                    if result.is_finite() {
+                        return Self::from_str(&format!("{:.15}", result))
+                            .map_err(|_| NumberError::DomainError("ln conversion failed".to_string()));
+                    }
+                }
+            }
         }
 
         let one = BigRational::one();
@@ -281,11 +305,9 @@ impl Number {
         let mut y_power = y.clone();
         let y_squared = &y * &y;
 
-        // Number of terms based on precision
-        // For arctanh series with |y| < 1/3 (since reduced is in [0.5, 2]),
-        // error after n terms is roughly |y|^(2n+1)/(2n+1)
-        // Need approximately precision/2 terms for precision decimal digits
-        let terms = (precision / 2 + 10).max(25) as i64;
+        // Number of terms based on precision (capped for performance)
+        // For arctanh series with |y| < 1/3, convergence is fast
+        let terms = ((precision / 2).max(10).min(60)) as i64;
         for i in 1..terms {
             y_power = &y_power * &y_squared;
             let term = &y_power / BigRational::from(BigInt::from(2 * i + 1));
@@ -308,6 +330,18 @@ impl Number {
     /// Exponential function (e^x) using argument reduction and Taylor series
     /// Uses exp(x) = exp(x - k*ln(2)) * 2^k to reduce argument to [-0.5, 0.5]
     pub fn exp(&self, precision: u32) -> Self {
+        // Fast path: use f64 for low precision (up to ~15 digits)
+        if precision <= 15 {
+            if let Some(f) = self.to_f64() {
+                let result = f.exp();
+                if result.is_finite() {
+                    if let Ok(n) = Self::from_str(&format!("{:.15e}", result)) {
+                        return n;
+                    }
+                }
+            }
+        }
+
         // ln(2) pre-computed with 100+ digit precision
         let ln2_str = "0.6931471805599453094172321214581765680755001343602552541206800094933936219696947156058633269964186875";
         let ln2 = Self::from_str(ln2_str).unwrap_or_else(|_| {
@@ -338,10 +372,9 @@ impl Number {
         let mut sum = BigRational::one();
         let mut term = BigRational::one();
 
-        // Number of terms based on precision
-        // For |reduced| < 0.5, Taylor series converges quickly
-        // Need approximately precision terms for precision decimal digits
-        let terms = (precision + 15).max(30) as i64;
+        // Number of terms based on precision (capped for performance)
+        // For |reduced| < 0.5, Taylor series converges very fast
+        let terms = (precision.max(15).min(80)) as i64;
         for i in 1..terms {
             term = &term * &reduced / BigRational::from(BigInt::from(i));
             sum = &sum + &term;
@@ -364,12 +397,16 @@ impl Number {
     }
 
     /// Golden ratio φ = (1 + √5) / 2
-    /// Computes using arbitrary precision sqrt for high precision
+    /// Uses precomputed value for efficiency (100+ digits available)
     pub fn phi(precision: u32) -> Self {
-        // For high precision, compute from sqrt(5)
+        // Use precomputed phi for up to 100 digits (fast path)
+        if precision <= 100 {
+            let phi_str = "1.6180339887498948482045868343656381177203091798057628621354486227052604628189024497072072041893911375";
+            return Self::from_str(phi_str).unwrap_or(Self::from_ratio(161803, 100000));
+        }
+        // For higher precision, compute from sqrt(5)
         let five = Self::from_i64(5);
         let sqrt5 = five.sqrt(precision).unwrap_or_else(|_| {
-            // Fallback to precomputed value
             Self::from_str("2.2360679774997896964091736687747632067176941640625").unwrap_or(Self::from_i64(2))
         });
         let one = Self::from_i64(1);
@@ -470,39 +507,66 @@ impl Number {
 
     /// Try to convert to f64
     fn to_f64(&self) -> Option<f64> {
+        let numer = self.inner.numer();
+        let denom = self.inner.denom();
+
         // First try direct conversion
-        if let (Some(n), Some(d)) = (self.inner.numer().to_f64(), self.inner.denom().to_f64()) {
+        if let (Some(n), Some(d)) = (numer.to_f64(), denom.to_f64()) {
             if n.is_finite() && d.is_finite() && d != 0.0 {
                 let result = n / d;
                 if result.is_finite() {
                     return Some(result);
                 }
             }
+        }
 
-            // Handle case where both overflow to infinity but ratio is finite
-            if n.is_infinite() && d.is_infinite() {
-                // Shift both numbers down until they fit in f64
-                let numer = self.inner.numer();
-                let denom = self.inner.denom();
+        // Handle case where numerator and/or denominator overflow f64
+        // This happens with BigRational after many operations
+        let numer_bits = numer.bits() as i32;
+        let denom_bits = denom.bits() as i32;
 
-                let numer_bits = numer.bits() as i32;
-                let denom_bits = denom.bits() as i32;
+        if numer_bits == 0 {
+            return Some(0.0);
+        }
 
-                // We need to reduce both to ~53 bits (f64 mantissa)
-                // Shift the larger one more to normalize
-                let max_bits = numer_bits.max(denom_bits);
-                let shift = (max_bits - 53).max(0);
+        // The ratio n/d has magnitude approximately 2^(numer_bits - denom_bits)
+        // We need to shift to get both in range of f64 mantissa (53 bits)
+        // while preserving the relative magnitude
 
-                let shifted_numer = numer >> shift as usize;
-                let shifted_denom = denom >> shift as usize;
+        // Shift both to ~53 bits
+        let target_bits = 53i32;
 
-                if let (Some(n_f64), Some(d_f64)) = (shifted_numer.to_f64(), shifted_denom.to_f64()) {
-                    if d_f64 != 0.0 {
-                        let result = n_f64 / d_f64;
-                        if result.is_finite() {
-                            return Some(result);
-                        }
-                    }
+        // Shift numerator to target_bits
+        let numer_shift = (numer_bits - target_bits).max(0) as usize;
+        // Shift denominator to target_bits
+        let denom_shift = (denom_bits - target_bits).max(0) as usize;
+
+        let shifted_numer = numer >> numer_shift;
+        let shifted_denom = denom >> denom_shift;
+
+        if let (Some(n_f64), Some(d_f64)) = (shifted_numer.to_f64(), shifted_denom.to_f64()) {
+            if d_f64 != 0.0 {
+                // Compute the base ratio
+                let base_ratio = n_f64 / d_f64;
+
+                // Account for the different shift amounts
+                // We shifted numer by numer_shift and denom by denom_shift
+                // So the true value is base_ratio * 2^(numer_shift - denom_shift)
+                let shift_diff = numer_shift as i32 - denom_shift as i32;
+
+                let result = if shift_diff == 0 {
+                    base_ratio
+                } else if shift_diff > 0 && shift_diff < 1024 {
+                    base_ratio * 2_f64.powi(shift_diff)
+                } else if shift_diff < 0 && shift_diff > -1024 {
+                    base_ratio / 2_f64.powi(-shift_diff)
+                } else {
+                    // Shift too large for f64
+                    return None;
+                };
+
+                if result.is_finite() {
+                    return Some(result);
                 }
             }
         }

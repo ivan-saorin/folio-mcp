@@ -79,26 +79,104 @@ fn extract_description(path: &Path) -> Option<String> {
     }
 }
 
-/// Load a .fmd file by name
-fn load_fmd_file(name: &str) -> Result<String, String> {
-    let base = data_path();
+/// Extract the base name from various input formats:
+/// - "mortgage" -> "mortgage"
+/// - "mortgage.fmd" -> "mortgage"
+/// - "/path/to/mortgage.fmd" -> "mortgage"
+/// - "C:\path\to\mortgage.fmd" -> "mortgage"
+/// - "examples/mortgage.fmd" -> "mortgage"
+fn extract_fmd_name(input: &str) -> String {
+    let input = input.trim();
 
-    // Try root first, then examples
+    // Handle both forward and back slashes for cross-platform compatibility
+    let normalized = input.replace('\\', "/");
+
+    // Get the filename part (after last slash)
+    let filename = normalized
+        .rsplit('/')
+        .next()
+        .unwrap_or(&normalized);
+
+    // Remove .fmd extension if present (case-insensitive)
+    let name = if filename.to_lowercase().ends_with(".fmd") {
+        &filename[..filename.len() - 4]
+    } else {
+        filename
+    };
+
+    name.to_string()
+}
+
+/// Load a .fmd file by name, filename, or path
+/// Accepts multiple formats:
+/// - name: "mortgage"
+/// - filename: "mortgage.fmd"
+/// - path: "/any/path/to/mortgage.fmd" or "C:\path\to\mortgage.fmd"
+///
+/// When running natively (not in Docker), the host path is tried directly first.
+/// When running in Docker, the path won't exist so we fall back to name extraction.
+fn load_fmd_file(input: &str) -> Result<String, String> {
+    let input = input.trim();
+
+    eprintln!("load_fmd_file: input='{}'", input);
+
+    // First, try the input directly as a path (works for native execution)
+    // This handles cases where the LLM provides a full valid path
+    let direct_path = Path::new(input);
+    if direct_path.is_absolute() && direct_path.exists() {
+        eprintln!("load_fmd_file: found at direct path '{}'", input);
+        return fs::read_to_string(direct_path)
+            .map_err(|e| format!("Failed to read '{}': {}", input, e));
+    }
+
+    // Also try with .fmd extension added if not present
+    if !input.to_lowercase().ends_with(".fmd") {
+        let with_ext = format!("{}.fmd", input);
+        let path_with_ext = Path::new(&with_ext);
+        if path_with_ext.is_absolute() && path_with_ext.exists() {
+            eprintln!("load_fmd_file: found at direct path with extension '{}'", with_ext);
+            return fs::read_to_string(path_with_ext)
+                .map_err(|e| format!("Failed to read '{}': {}", with_ext, e));
+        }
+    }
+
+    // Extract just the name and try the data directory
+    let base = data_path();
+    let name = extract_fmd_name(input);
+
+    eprintln!("load_fmd_file: extracted name='{}'", name);
+
+    if name.is_empty() {
+        return Err(format!(
+            "Invalid file reference: '{}'. Please provide a file name like 'mortgage' or 'mortgage.fmd'. Available: {:?}",
+            input,
+            list_fmd_files().iter().map(|f| &f.name).collect::<Vec<_>>()
+        ));
+    }
+
+    // Try multiple locations in the data directory
     let candidates = [
         base.join(format!("{}.fmd", name)),
         base.join("examples").join(format!("{}.fmd", name)),
+        // Also try case variations
+        base.join(format!("{}.fmd", name.to_lowercase())),
+        base.join("examples").join(format!("{}.fmd", name.to_lowercase())),
     ];
 
     for path in candidates {
         if path.exists() {
+            eprintln!("load_fmd_file: found at '{}'", path.display());
             return fs::read_to_string(&path)
                 .map_err(|e| format!("Failed to read '{}': {}", path.display(), e));
         }
     }
 
-    Err(format!("File '{}' not found. Available: {:?}",
-        name,
-        list_fmd_files().iter().map(|f| &f.name).collect::<Vec<_>>()))
+    // Provide helpful error with available files
+    let available: Vec<_> = list_fmd_files().iter().map(|f| f.name.clone()).collect();
+    Err(format!(
+        "File '{}' not found (extracted from '{}'). Available files: {:?}",
+        name, input, available
+    ))
 }
 
 #[derive(Debug, Serialize)]
@@ -758,12 +836,93 @@ fn tool_eval_batch(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError
 
 fn tool_folio(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
     let name = args.get("name").and_then(|v| v.as_str());
+
+    // If no name provided, return comprehensive overview
+    if name.is_none() {
+        let overview = generate_folio_overview(folio);
+        return Ok(json!({
+            "content": [{ "type": "text", "text": overview }]
+        }));
+    }
+
     let help = folio.help(name);
 
     Ok(json!({
         "content": [{ "type": "text", "text": format_help(&help) }],
         "data": value_to_json(&help)
     }))
+}
+
+fn generate_folio_overview(folio: &Folio) -> String {
+    let mut out = String::new();
+
+    out.push_str("# Folio - Markdown Computational Documents\n\n");
+    out.push_str("Arbitrary precision arithmetic for LLMs. All calculations use exact rational arithmetic.\n\n");
+
+    // Functions
+    out.push_str("## Available Functions\n\n");
+    out.push_str("| Function | Description | Usage |\n");
+    out.push_str("|----------|-------------|-------|\n");
+
+    if let Value::List(funcs) = folio.list_functions(None) {
+        for func in funcs {
+            if let Value::Object(map) = func {
+                let name = map.get("name").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let desc = map.get("description").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let usage = map.get("usage").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                out.push_str(&format!("| `{}` | {} | `{}` |\n", name, desc, usage));
+            }
+        }
+    }
+
+    // Constants
+    out.push_str("\n## Available Constants\n\n");
+    out.push_str("| Constant | Value/Formula | Category | Source |\n");
+    out.push_str("|----------|---------------|----------|--------|\n");
+
+    if let Value::List(consts) = folio.list_constants() {
+        for c in consts {
+            if let Value::Object(map) = c {
+                let name = map.get("name").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let formula = map.get("formula").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let category = map.get("category").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let source = map.get("source").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                out.push_str(&format!("| `{}` | {} | {} | {} |\n", name, formula, category, source));
+            }
+        }
+    }
+
+    // Operators
+    out.push_str("\n## Operators\n\n");
+    out.push_str("| Operator | Description | Example |\n");
+    out.push_str("|----------|-------------|--------|\n");
+    out.push_str("| `+` | Addition | `a + b` |\n");
+    out.push_str("| `-` | Subtraction | `a - b` |\n");
+    out.push_str("| `*` | Multiplication | `a * b` |\n");
+    out.push_str("| `/` | Division | `a / b` |\n");
+    out.push_str("| `^` | Power | `a ^ b` |\n");
+    out.push_str("| `()` | Grouping | `(a + b) * c` |\n");
+
+    // Document format
+    out.push_str("\n## Document Format\n\n");
+    out.push_str("Folio documents use markdown tables for calculations:\n\n");
+    out.push_str("```markdown\n");
+    out.push_str("## Section Name @precision:50\n\n");
+    out.push_str("| name | formula | result |\n");
+    out.push_str("|------|---------|--------|\n");
+    out.push_str("| x | 10 | |\n");
+    out.push_str("| y | x * 2 | |\n");
+    out.push_str("| z | sqrt(y) | |\n");
+    out.push_str("```\n\n");
+
+    // Directives
+    out.push_str("## Directives\n\n");
+    out.push_str("| Directive | Description | Example |\n");
+    out.push_str("|-----------|-------------|--------|\n");
+    out.push_str("| `@precision:N` | Set decimal precision | `@precision:100` |\n");
+    out.push_str("| `@sigfigs:N` | Display with N significant figures | `@sigfigs:6` |\n");
+
+    out
 }
 
 fn format_help(help: &Value) -> String {
@@ -773,6 +932,24 @@ fn format_help(help: &Value) -> String {
             if let Some(Value::Text(n)) = map.get("name") { out.push_str(&format!("# {}\n\n", n)); }
             if let Some(Value::Text(d)) = map.get("description") { out.push_str(&format!("{}\n\n", d)); }
             if let Some(Value::Text(u)) = map.get("usage") { out.push_str(&format!("**Usage:** `{}`\n\n", u)); }
+            if let Some(Value::Text(c)) = map.get("category") { out.push_str(&format!("**Category:** {}\n\n", c)); }
+            if let Some(Value::List(examples)) = map.get("examples") {
+                out.push_str("**Examples:**\n");
+                for ex in examples {
+                    if let Value::Text(e) = ex {
+                        out.push_str(&format!("- `{}`\n", e));
+                    }
+                }
+                out.push_str("\n");
+            }
+            if let Some(Value::List(related)) = map.get("related") {
+                let related_str: Vec<_> = related.iter().filter_map(|r| {
+                    if let Value::Text(s) = r { Some(format!("`{}`", s)) } else { None }
+                }).collect();
+                if !related_str.is_empty() {
+                    out.push_str(&format!("**Related:** {}\n", related_str.join(", ")));
+                }
+            }
             out
         }
         Value::Error(e) => format!("Error: {}", e.message),
@@ -783,12 +960,49 @@ fn format_help(help: &Value) -> String {
 fn tool_list_functions(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
     let category = args.get("category").and_then(|v| v.as_str());
     let functions = folio.list_functions(category);
-    Ok(json!({ "content": [{ "type": "text", "text": "Functions listed" }], "data": value_to_json(&functions) }))
+
+    // Build readable table
+    let mut text = String::from("# Available Functions\n\n");
+    text.push_str("| Function | Description | Usage |\n");
+    text.push_str("|----------|-------------|-------|\n");
+
+    if let Value::List(funcs) = &functions {
+        for func in funcs {
+            if let Value::Object(map) = func {
+                let name = map.get("name").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let desc = map.get("description").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let usage = map.get("usage").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                text.push_str(&format!("| `{}` | {} | `{}` |\n", name, desc, usage));
+            }
+        }
+    }
+
+    Ok(json!({ "content": [{ "type": "text", "text": text }], "data": value_to_json(&functions) }))
 }
 
 fn tool_list_constants(folio: &Folio, _args: JsonValue) -> Result<JsonValue, McpError> {
     let constants = folio.list_constants();
-    Ok(json!({ "content": [{ "type": "text", "text": "Constants listed" }], "data": value_to_json(&constants) }))
+
+    // Build readable table grouped by category
+    let mut text = String::from("# Available Constants\n\n");
+    text.push_str("| Constant | Value/Formula | Category | Source |\n");
+    text.push_str("|----------|---------------|----------|--------|\n");
+
+    if let Value::List(consts) = &constants {
+        for c in consts {
+            if let Value::Object(map) = c {
+                let name = map.get("name").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let formula = map.get("formula").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let category = map.get("category").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                let source = map.get("source").and_then(|v| if let Value::Text(s) = v { Some(s.as_str()) } else { None }).unwrap_or("");
+                text.push_str(&format!("| `{}` | {} | {} | {} |\n", name, formula, category, source));
+            }
+        }
+    }
+
+    text.push_str("\n**Note:** Particle masses are in MeV. Use constants directly in formulas, e.g., `m_e * c^2`\n");
+
+    Ok(json!({ "content": [{ "type": "text", "text": text }], "data": value_to_json(&constants) }))
 }
 
 fn tool_decompose(_folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
