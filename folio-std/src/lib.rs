@@ -46,6 +46,12 @@ pub fn load_standard_library(registry: PluginRegistry) -> PluginRegistry {
         // Physical constants
         .with_constant(constants::c())
         .with_constant(constants::alpha())
+        // ASCII aliases for Unicode constants
+        .with_constant(constants::phi_ascii())    // "phi" alias for "φ"
+        .with_constant(constants::pi_ascii())     // "pi" alias for "π"
+        .with_constant(constants::alpha_ascii())  // "alpha" alias for "α"
+        .with_constant(constants::m_mu_ascii())   // "m_mu" alias for "m_μ"
+        .with_constant(constants::m_tau_ascii())  // "m_tau" alias for "m_τ"
 }
 
 /// Create registry with standard library

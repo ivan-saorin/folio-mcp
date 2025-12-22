@@ -6,9 +6,12 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-num-bigint = { workspace = true }
-num-rational = { workspace = true }
-num-traits = { workspace = true }
+# Arbitrary precision - dashu replaces num-bigint/num-rational
+dashu-base = { workspace = true }
+dashu-int = { workspace = true }
+dashu-ratio = { workspace = true }
+dashu-float = { workspace = true }
+
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

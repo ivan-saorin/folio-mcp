@@ -153,3 +153,53 @@ pub fn alpha() -> ConstantDef {
         category: "physical".to_string(),
     }
 }
+
+// ============================================================================
+// ASCII Aliases for Unicode Constants
+// These allow users to type "phi" instead of "φ", etc.
+// ============================================================================
+
+pub fn phi_ascii() -> ConstantDef {
+    ConstantDef {
+        name: "phi".to_string(),
+        formula: "(1 + sqrt(5)) / 2".to_string(),
+        source: "https://oeis.org/A001622".to_string(),
+        category: "algebraic".to_string(),
+    }
+}
+
+pub fn pi_ascii() -> ConstantDef {
+    ConstantDef {
+        name: "pi".to_string(),
+        formula: "pi".to_string(),
+        source: "https://oeis.org/A000796".to_string(),
+        category: "transcendental".to_string(),
+    }
+}
+
+pub fn alpha_ascii() -> ConstantDef {
+    ConstantDef {
+        name: "alpha".to_string(),
+        formula: "0.0072973525693".to_string(),
+        source: "CODATA 2022 - fine-structure constant".to_string(),
+        category: "physical".to_string(),
+    }
+}
+
+pub fn m_mu_ascii() -> ConstantDef {
+    ConstantDef {
+        name: "m_mu".to_string(),
+        formula: "105.6583755".to_string(),  // MeV
+        source: "PDG 2024 / CODATA 2022 - muon mass".to_string(),
+        category: "particle_mass".to_string(),
+    }
+}
+
+pub fn m_tau_ascii() -> ConstantDef {
+    ConstantDef {
+        name: "m_tau".to_string(),
+        formula: "1776.86".to_string(),  // MeV
+        source: "PDG 2024 / CODATA 2022 - tau mass".to_string(),
+        category: "particle_mass".to_string(),
+    }
+}

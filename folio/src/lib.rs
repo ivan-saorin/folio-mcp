@@ -428,4 +428,90 @@ mod tests {
         assert!(rendered.contains("2.998e8") || rendered.contains("299800000"),
             "Speed of light display: {}", rendered);
     }
+
+    #[test]
+    fn test_physics_constants() {
+        // Test that physics constants (m_e, m_mu, etc.) now work correctly
+        let folio = test_folio();
+        let doc = r#"
+## Physics Constants @precision:10
+| name | formula | result |
+|------|---------|--------|
+| electron_mass | m_e | |
+| muon_mass | m_mu | |
+| tau_mass | m_tau | |
+| higgs_mass | m_H | |
+| cabibbo | V_us | |
+| speed_of_light | c | |
+| fine_structure | alpha | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // m_e should be ~0.511 MeV
+        let m_e = result.values.get("electron_mass").unwrap();
+        assert!(!m_e.is_error(), "m_e should resolve, got: {:?}", m_e);
+        let m_e_str = m_e.as_number().unwrap().as_decimal(3);
+        assert!(m_e_str.starts_with("0.510") || m_e_str.starts_with("0.511"),
+            "m_e should be ~0.511 MeV, got: {}", m_e_str);
+
+        // m_mu should be ~105.66 MeV
+        let m_mu = result.values.get("muon_mass").unwrap();
+        assert!(!m_mu.is_error(), "m_mu should resolve, got: {:?}", m_mu);
+        let m_mu_str = m_mu.as_number().unwrap().as_decimal(1);
+        assert!(m_mu_str.starts_with("105."),
+            "m_mu should be ~105.66 MeV, got: {}", m_mu_str);
+
+        // m_tau should be ~1776.86 MeV
+        let m_tau = result.values.get("tau_mass").unwrap();
+        assert!(!m_tau.is_error(), "m_tau should resolve, got: {:?}", m_tau);
+        let m_tau_str = m_tau.as_number().unwrap().as_decimal(0);
+        assert!(m_tau_str.starts_with("1776") || m_tau_str.starts_with("1777"),
+            "m_tau should be ~1776.86 MeV, got: {}", m_tau_str);
+
+        // V_us should be ~0.2243
+        let v_us = result.values.get("cabibbo").unwrap();
+        assert!(!v_us.is_error(), "V_us should resolve, got: {:?}", v_us);
+        let v_us_str = v_us.as_number().unwrap().as_decimal(3);
+        assert!(v_us_str.starts_with("0.224"),
+            "V_us should be ~0.2243, got: {}", v_us_str);
+
+        // c should be 299792458 m/s
+        let c = result.values.get("speed_of_light").unwrap();
+        assert!(!c.is_error(), "c should resolve, got: {:?}", c);
+        let c_val = c.as_number().unwrap().to_i64().unwrap();
+        assert_eq!(c_val, 299792458, "c should be 299792458 m/s");
+
+        // alpha should be ~0.0073
+        let alpha = result.values.get("fine_structure").unwrap();
+        assert!(!alpha.is_error(), "alpha should resolve, got: {:?}", alpha);
+        let alpha_str = alpha.as_number().unwrap().as_decimal(4);
+        assert!(alpha_str.starts_with("0.0072") || alpha_str.starts_with("0.0073"),
+            "alpha should be ~0.00729, got: {}", alpha_str);
+    }
+
+    #[test]
+    fn test_single_hash_header() {
+        // Test that single # headers now work (previously returned empty)
+        let folio = test_folio();
+        let doc = r#"
+# Klein Validation @precision:30
+
+| name | formula | result |
+|------|---------|--------|
+| x | 5 | |
+| y | x * 2 | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // Should have parsed the content
+        assert!(!result.values.is_empty(), "Single # header should parse content");
+
+        let x = result.values.get("x").unwrap();
+        assert!(!x.is_error(), "x should resolve to 5");
+        assert_eq!(x.as_number().unwrap().to_i64(), Some(5));
+
+        let y = result.values.get("y").unwrap();
+        assert!(!y.is_error(), "y should resolve to 10");
+        assert_eq!(y.as_number().unwrap().to_i64(), Some(10));
+    }
 }

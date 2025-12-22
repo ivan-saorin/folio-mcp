@@ -1,11 +1,13 @@
-//! Arbitrary precision rational numbers
+//! Arbitrary precision numbers using dashu
 //!
-//! Wraps `num_rational::BigRational` for unlimited precision arithmetic.
-//! All operations return Results - never panic.
+//! Uses dashu-float (DBig) for arbitrary precision decimal arithmetic.
+//! Native support for transcendentals (ln, exp, sqrt) without
+//! the denominator explosion issues of rational arithmetic.
 
-use num_bigint::BigInt;
-use num_rational::BigRational;
-use num_traits::{ToPrimitive, Zero, One, Signed};
+use dashu_float::DBig;
+use dashu_float::ops::{SquareRoot, Abs};
+use dashu_int::IBig;
+use dashu_int::ops::BitTest;
 use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use thiserror::Error;
 
@@ -25,92 +27,110 @@ pub enum NumberError {
     Overflow,
 }
 
-/// Arbitrary precision rational number
+/// Default precision for calculations (decimal digits)
+const DEFAULT_PRECISION: usize = 50;
+
+/// Arbitrary precision decimal number
+/// 
+/// Built on dashu-float's DBig for efficient transcendental operations.
+/// All operations return Results or new Numbers - never panic.
 #[derive(Debug, Clone)]
 pub struct Number {
-    inner: BigRational,
+    inner: DBig,
 }
 
 impl Number {
+    // ========== Construction ==========
+
+    /// Ensure a DBig has adequate precision for calculations
+    fn with_work_precision(val: DBig) -> DBig {
+        val.with_precision(DEFAULT_PRECISION).value()
+    }
+
     /// Create from string representation
-    /// Supports: "123", "3.14", "1/3", "1.5e10"
+    /// Supports: "123", "3.14", "1/3", "1.5e10", "-42"
     pub fn from_str(s: &str) -> Result<Self, NumberError> {
         let s = s.trim();
-
-        // Try rational format first (e.g., "1/3")
-        if s.contains('/') && !s.contains('.') {
+        
+        // Handle rational format "a/b"
+        if s.contains('/') && !s.contains('.') && !s.contains('e') && !s.contains('E') {
             let parts: Vec<&str> = s.split('/').collect();
             if parts.len() == 2 {
-                let num: BigInt = parts[0].trim().parse()
+                let num_str = parts[0].trim();
+                let den_str = parts[1].trim();
+                
+                let num: DBig = num_str.parse()
                     .map_err(|_| NumberError::ParseError(s.to_string()))?;
-                let den: BigInt = parts[1].trim().parse()
+                let den: DBig = den_str.parse()
                     .map_err(|_| NumberError::ParseError(s.to_string()))?;
-                if den.is_zero() {
+                
+                if den == DBig::ZERO {
                     return Err(NumberError::DivisionByZero);
                 }
-                return Ok(Self { inner: BigRational::new(num, den) });
+                
+                let result = Self::with_work_precision(num) / Self::with_work_precision(den);
+                return Ok(Self { inner: result });
             }
         }
 
-        // Handle scientific notation
-        if s.contains('e') || s.contains('E') {
+        // Handle scientific notation with integer mantissa: "602214076e15"
+        if (s.contains('e') || s.contains('E')) && !s.contains('.') {
             let s_lower = s.to_lowercase();
             let parts: Vec<&str> = s_lower.split('e').collect();
             if parts.len() == 2 {
-                let base = Self::from_str(parts[0])?;
+                let mantissa: IBig = parts[0].parse()
+                    .map_err(|_| NumberError::ParseError(s.to_string()))?;
                 let exp: i32 = parts[1].parse()
                     .map_err(|_| NumberError::ParseError(s.to_string()))?;
-                let ten = BigInt::from(10);
-                if exp >= 0 {
-                    let multiplier = BigRational::from(num_traits::pow(ten, exp as usize));
-                    return Ok(Self { inner: base.inner * multiplier });
-                } else {
-                    let divisor = BigRational::from(num_traits::pow(ten, (-exp) as usize));
-                    return Ok(Self { inner: base.inner / divisor });
-                }
+                
+                // Use DBig::from_parts for exact scientific notation
+                // significand * 10^exponent
+                let result = DBig::from_parts(mantissa, exp as isize);
+                return Ok(Self { inner: Self::with_work_precision(result) });
             }
         }
 
-        // Handle decimal format
-        if s.contains('.') {
-            let parts: Vec<&str> = s.split('.').collect();
-            if parts.len() == 2 {
-                let decimal_places = parts[1].len() as u32;
-                let combined = format!("{}{}", parts[0], parts[1]);
-                let numerator: BigInt = combined.parse()
-                    .map_err(|_| NumberError::ParseError(s.to_string()))?;
-                let denominator = num_traits::pow(BigInt::from(10), decimal_places as usize);
-                return Ok(Self {
-                    inner: BigRational::new(numerator, denominator),
-                });
-            }
-        }
-
-        // Try integer
-        let n: BigInt = s.parse()
+        // Standard decimal parsing
+        let inner: DBig = s.parse()
             .map_err(|_| NumberError::ParseError(s.to_string()))?;
-        Ok(Self { inner: BigRational::from(n) })
+        
+        Ok(Self { inner: Self::with_work_precision(inner) })
     }
 
-    /// Create from integer
+    /// Create from i64 with working precision
     pub fn from_i64(n: i64) -> Self {
-        Self { inner: BigRational::from(BigInt::from(n)) }
+        Self { inner: Self::with_work_precision(DBig::from(n)) }
     }
 
-    /// Create from ratio
+    /// Create from ratio (exact division)
     pub fn from_ratio(num: i64, den: i64) -> Self {
-        Self { inner: BigRational::new(BigInt::from(num), BigInt::from(den)) }
+        if den == 0 {
+            return Self { inner: DBig::ZERO };
+        }
+        let n = Self::with_work_precision(DBig::from(num));
+        let d = Self::with_work_precision(DBig::from(den));
+        Self { inner: n / d }
     }
+
+    // ========== Predicates ==========
 
     /// Check if zero
     pub fn is_zero(&self) -> bool {
-        self.inner.is_zero()
+        self.inner == DBig::ZERO
     }
 
     /// Check if negative
     pub fn is_negative(&self) -> bool {
-        self.inner.is_negative()
+        self.inner < DBig::ZERO
     }
+
+    /// Check if value is an integer
+    pub fn is_integer(&self) -> bool {
+        let floor_val = self.inner.clone().floor();
+        self.inner == floor_val
+    }
+
+    // ========== Basic Arithmetic ==========
 
     /// Addition
     pub fn add(&self, other: &Self) -> Self {
@@ -136,28 +156,29 @@ impl Number {
         }
     }
 
-    /// Integer power
+    /// Integer power (exact)
     pub fn pow(&self, exp: i32) -> Self {
         if exp == 0 {
             return Self::from_i64(1);
         }
-        if exp > 0 {
-            let mut result = self.inner.clone();
-            for _ in 1..exp {
-                result = &result * &self.inner;
-            }
-            Self { inner: result }
+        
+        let abs_exp = exp.unsigned_abs();
+        let mut result = Self::from_i64(1);
+        
+        // Simple repeated multiplication
+        for _ in 0..abs_exp {
+            result = result.mul(self);
+        }
+        
+        if exp < 0 {
+            Self::from_i64(1).checked_div(&result).unwrap_or(Self::from_i64(0))
         } else {
-            // Negative exponent: 1 / x^|exp|
-            let pos_pow = self.pow(-exp);
-            Self { inner: BigRational::one() / pos_pow.inner }
+            result
         }
     }
 
-    /// Real-valued power using x^y = exp(y * ln(x))
-    /// Works for any exponent (integer, fractional, negative)
+    /// Real-valued power: x^y = exp(y * ln(x))
     pub fn pow_real(&self, exp: &Self, precision: u32) -> Self {
-        // Special cases
         if exp.is_zero() {
             return Self::from_i64(1);
         }
@@ -165,7 +186,7 @@ impl Number {
             return Self::from_i64(0);
         }
 
-        // If exponent is an integer, use fast integer power
+        // If exponent is a small integer, use exact power
         if exp.is_integer() {
             if let Some(e) = exp.to_i64() {
                 if e.abs() <= i32::MAX as i64 {
@@ -176,289 +197,184 @@ impl Number {
 
         // For x^y where x > 0: x^y = exp(y * ln(x))
         if self.is_negative() {
-            // Can't compute real power of negative base with non-integer exponent
-            // Return NaN-like behavior (just return 0 for now)
             return Self::from_i64(0);
         }
 
-        match self.ln(precision) {
-            Ok(ln_base) => {
-                let product = ln_base.mul(exp);
-                product.exp(precision)
-            }
-            Err(_) => Self::from_i64(0),
-        }
+        let ln_x = self.inner.clone().with_precision(precision as usize).value().ln();
+        let product = &ln_x * &exp.inner;
+        Self { inner: product.exp() }
     }
 
-    /// Square root using Newton-Raphson with controlled precision
-    /// Uses digit-based iteration count to achieve arbitrary precision
+    // ========== Transcendental Functions ==========
+
+    /// Square root
     pub fn sqrt(&self, precision: u32) -> Result<Self, NumberError> {
         if self.is_negative() {
-            return Err(NumberError::DomainError("square root of negative number".to_string()));
+            return Err(NumberError::DomainError(
+                "square root of negative number".to_string()
+            ));
         }
         if self.is_zero() {
             return Ok(Self::from_i64(0));
         }
 
-        // For perfect squares of small integers, return exact result
-        if self.is_integer() {
-            if let Some(n) = self.to_i64() {
-                if n > 0 && n <= 1_000_000_000_000i64 {
-                    let isqrt = (n as f64).sqrt() as i64;
-                    if isqrt * isqrt == n {
-                        return Ok(Self::from_i64(isqrt));
-                    }
-                }
-            }
-        }
-
-        // Fast path: use f64 for low precision (up to ~15 digits)
-        if precision <= 15 {
-            if let Some(f) = self.to_f64() {
-                let s = f.sqrt();
-                if s.is_finite() && s > 0.0 {
-                    return Self::from_str(&format!("{:.15}", s))
-                        .map_err(|_| NumberError::DomainError("sqrt conversion failed".to_string()));
-                }
-            }
-        }
-
-        // Newton-Raphson: x_{n+1} = (x_n + S/x_n) / 2
-        // Start with f64 approximation as initial guess
-        let two = BigRational::from(BigInt::from(2));
-
-        let initial_guess = if let Some(f) = self.to_f64() {
-            let s = f.sqrt();
-            if s.is_finite() && s > 0.0 {
-                Self::from_str(&format!("{:.15}", s))
-                    .unwrap_or(Self::from_i64(1))
-            } else {
-                Self::from_i64(1)
-            }
-        } else {
-            Self::from_i64(1)
-        };
-
-        let mut x = initial_guess.inner;
-
-        // Number of iterations: Newton-Raphson doubles precision each iteration
-        // Start with ~15 digits from f64, need ceil(log2(precision/15)) more iterations
-        // Cap at reasonable number for performance
-        let iterations = ((precision as f64 / 15.0).log2().ceil() as u32 + 2).max(3).min(10);
-
-        for _ in 0..iterations {
-            // x = (x + self/x) / 2
-            let quotient = &self.inner / &x;
-            x = (&x + &quotient) / &two;
-        }
-
-        Ok(Self { inner: x })
+        let val = self.inner.clone().with_precision(precision as usize).value();
+        Ok(Self { inner: val.sqrt() })
     }
 
-    /// Natural logarithm using argument reduction and series expansion
-    /// Uses ln(x) = k*ln(2) + ln(x/2^k) to bring argument close to 1
+    /// Natural logarithm
     pub fn ln(&self, precision: u32) -> Result<Self, NumberError> {
-        if self.inner <= BigRational::zero() {
-            return Err(NumberError::DomainError("logarithm of non-positive number".to_string()));
+        if self.inner <= DBig::ZERO {
+            return Err(NumberError::DomainError(
+                "logarithm of non-positive number".to_string()
+            ));
         }
 
-        // Fast path: use f64 for low precision (up to ~15 digits)
-        if precision <= 15 {
-            if let Some(f) = self.to_f64() {
-                if f > 0.0 {
-                    let result = f.ln();
-                    if result.is_finite() {
-                        return Self::from_str(&format!("{:.15}", result))
-                            .map_err(|_| NumberError::DomainError("ln conversion failed".to_string()));
-                    }
-                }
-            }
-        }
-
-        let one = BigRational::one();
-        let two = BigRational::from(BigInt::from(2));
-
-        // Argument reduction: find k such that x/2^k is close to 1
-        // We want x/2^k to be in [0.5, 2] for good convergence
-        let mut reduced = self.inner.clone();
-        let mut k: i64 = 0;
-
-        // Reduce while x > 2
-        while reduced > two {
-            reduced = &reduced / &two;
-            k += 1;
-        }
-
-        // Reduce while x < 0.5
-        let half = &one / &two;
-        while reduced < half {
-            reduced = &reduced * &two;
-            k -= 1;
-        }
-
-        // Now compute ln(reduced) using the arctanh series
-        // ln(x) = 2 * arctanh((x-1)/(x+1))
-        // arctanh(y) = y + y^3/3 + y^5/5 + ...
-        let y = (&reduced - &one) / (&reduced + &one);
-
-        let mut sum = y.clone();
-        let mut y_power = y.clone();
-        let y_squared = &y * &y;
-
-        // Number of terms based on precision (capped for performance)
-        // For arctanh series with |y| < 1/3, convergence is fast
-        let terms = ((precision / 2).max(10).min(60)) as i64;
-        for i in 1..terms {
-            y_power = &y_power * &y_squared;
-            let term = &y_power / BigRational::from(BigInt::from(2 * i + 1));
-            sum = &sum + &term;
-        }
-
-        let ln_reduced = &two * &sum;
-
-        // ln(2) pre-computed with 100+ digit precision
-        let ln2_str = "0.6931471805599453094172321214581765680755001343602552541206800094933936219696947156058633269964186875";
-        let ln2 = Self::from_str(ln2_str).unwrap_or_else(|_| {
-            Self { inner: BigRational::from_float(0.693147180559945).unwrap() }
-        });
-
-        // ln(x) = k*ln(2) + ln(reduced)
-        let k_rational = BigRational::from(BigInt::from(k));
-        Ok(Self { inner: &ln_reduced + &(&k_rational * &ln2.inner) })
+        let val = self.inner.clone().with_precision(precision as usize).value();
+        Ok(Self { inner: val.ln() })
     }
 
-    /// Exponential function (e^x) using argument reduction and Taylor series
-    /// Uses exp(x) = exp(x - k*ln(2)) * 2^k to reduce argument to [-0.5, 0.5]
+    /// Exponential function (e^x)
     pub fn exp(&self, precision: u32) -> Self {
-        // Fast path: use f64 for low precision (up to ~15 digits)
-        if precision <= 15 {
-            if let Some(f) = self.to_f64() {
-                let result = f.exp();
-                if result.is_finite() {
-                    if let Ok(n) = Self::from_str(&format!("{:.15e}", result)) {
-                        return n;
-                    }
-                }
-            }
-        }
+        let val = self.inner.clone().with_precision(precision as usize).value();
+        Self { inner: val.exp() }
+    }
 
-        // ln(2) pre-computed with 100+ digit precision
-        let ln2_str = "0.6931471805599453094172321214581765680755001343602552541206800094933936219696947156058633269964186875";
-        let ln2 = Self::from_str(ln2_str).unwrap_or_else(|_| {
-            Self { inner: BigRational::from_float(0.693147180559945).unwrap() }
-        });
-
-        // Argument reduction: find k such that |x - k*ln(2)| < 0.5
-        // k = round(x / ln(2)) - computed using BigRational for precision
-        let x_div_ln2 = &self.inner / &ln2.inner;
-
-        // Round to nearest integer: floor(x + 0.5) for positive, ceil(x - 0.5) for negative
-        let half = BigRational::new(BigInt::from(1), BigInt::from(2));
-        let k_big = if x_div_ln2 >= BigRational::zero() {
-            (&x_div_ln2 + &half).floor()
-        } else {
-            (&x_div_ln2 - &half).ceil()
-        };
-
-        // Convert k to i64 for power calculation (should always fit for reasonable inputs)
-        let k: i64 = k_big.numer().to_i64().unwrap_or(0) / k_big.denom().to_i64().unwrap_or(1);
-
-        // reduced = x - k * ln(2)
-        let k_rational = BigRational::from(BigInt::from(k));
-        let reduced = &self.inner - &(&k_rational * &ln2.inner);
-
-        // Compute exp(reduced) using Taylor series
-        // exp(x) = 1 + x + x^2/2! + x^3/3! + ...
-        let mut sum = BigRational::one();
-        let mut term = BigRational::one();
-
-        // Number of terms based on precision (capped for performance)
-        // For |reduced| < 0.5, Taylor series converges very fast
-        let terms = (precision.max(15).min(80)) as i64;
-        for i in 1..terms {
-            term = &term * &reduced / BigRational::from(BigInt::from(i));
+    /// Sine function (Taylor series)
+    pub fn sin(&self, precision: u32) -> Self {
+        let x = self.inner.clone().with_precision(precision as usize).value();
+        let x_squared = &x * &x;
+        
+        let mut sum = x.clone();
+        let mut term = x.clone();
+        
+        let iterations = (precision / 3).max(12).min(50) as i64;
+        for k in 1..iterations {
+            let denom = DBig::from((2 * k) * (2 * k + 1));
+            term = -&term * &x_squared / denom;
             sum = &sum + &term;
         }
-
-        // exp(x) = exp(reduced) * 2^k
-        let exp_reduced = Self { inner: sum };
-        if k == 0 {
-            exp_reduced
-        } else if k > 0 {
-            // Use BigInt for 2^k to handle large exponents
-            let two = BigInt::from(2);
-            let two_pow_k = num_traits::pow(two, k as usize);
-            Self { inner: &exp_reduced.inner * BigRational::from(two_pow_k) }
-        } else {
-            let two = BigInt::from(2);
-            let two_pow_neg_k = num_traits::pow(two, (-k) as usize);
-            Self { inner: &exp_reduced.inner / BigRational::from(two_pow_neg_k) }
-        }
-    }
-
-    /// Golden ratio φ = (1 + √5) / 2
-    /// Uses precomputed value for efficiency (100+ digits available)
-    pub fn phi(precision: u32) -> Self {
-        // Use precomputed phi for up to 100 digits (fast path)
-        if precision <= 100 {
-            let phi_str = "1.6180339887498948482045868343656381177203091798057628621354486227052604628189024497072072041893911375";
-            return Self::from_str(phi_str).unwrap_or(Self::from_ratio(161803, 100000));
-        }
-        // For higher precision, compute from sqrt(5)
-        let five = Self::from_i64(5);
-        let sqrt5 = five.sqrt(precision).unwrap_or_else(|_| {
-            Self::from_str("2.2360679774997896964091736687747632067176941640625").unwrap_or(Self::from_i64(2))
-        });
-        let one = Self::from_i64(1);
-        let two = Self::from_i64(2);
-        one.add(&sqrt5).checked_div(&two).unwrap_or(Self::from_i64(1))
-    }
-
-    /// Pi (pre-computed high precision value)
-    pub fn pi(_precision: u32) -> Self {
-        // Use pre-computed Pi with 100+ digits
-        let pi_str = "3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679";
-        Self::from_str(pi_str).unwrap_or(Self::from_ratio(355, 113)) // fallback to rational approx
-    }
-
-    /// Arctan using Taylor series (limited iterations for efficiency)
-    #[allow(dead_code)]
-    fn arctan(x: &Self, _precision: u32) -> Self {
-        // arctan(x) = x - x^3/3 + x^5/5 - x^7/7 + ...
-        let mut sum = x.inner.clone();
-        let mut x_power = x.inner.clone();
-        let x_squared = &x.inner * &x.inner;
-
-        // Fixed 15 iterations
-        let terms = 15;
-        for k in 1..terms {
-            x_power = &x_power * &x_squared;
-            let sign = if k % 2 == 1 { -1i64 } else { 1i64 };
-            let term = &x_power * BigRational::from(BigInt::from(sign))
-                / BigRational::from(BigInt::from(2 * k + 1));
-            sum = &sum + &term;
-        }
-
+        
         Self { inner: sum }
     }
 
-    /// Euler's number e (pre-computed for efficiency)
-    pub fn e(_precision: u32) -> Self {
-        let e_str = "2.7182818284590452353602874713526624977572470936999595749669";
-        Self::from_str(e_str).unwrap_or(Self::from_ratio(2718281828, 1000000000))
+    /// Cosine function (Taylor series)
+    pub fn cos(&self, precision: u32) -> Self {
+        let x = self.inner.clone().with_precision(precision as usize).value();
+        let x_squared = &x * &x;
+        
+        let one = DBig::ONE.with_precision(precision as usize).value();
+        let mut sum = one.clone();
+        let mut term = one;
+        
+        let iterations = (precision / 3).max(12).min(50) as i64;
+        for k in 1..iterations {
+            let denom = DBig::from((2 * k - 1) * (2 * k));
+            term = -&term * &x_squared / denom;
+            sum = &sum + &term;
+        }
+        
+        Self { inner: sum }
     }
 
-    /// Render as decimal string
-    /// For very small numbers (< 10^-6), shows enough decimal places to display
-    /// at least 3 significant digits instead of just showing 0.0000000000
+    /// Tangent function (sin/cos)
+    pub fn tan(&self, precision: u32) -> Result<Self, NumberError> {
+        let cos_x = self.cos(precision);
+        if cos_x.is_zero() {
+            return Err(NumberError::DomainError(
+                "tan undefined at odd multiples of π/2".to_string()
+            ));
+        }
+        let sin_x = self.sin(precision);
+        sin_x.checked_div(&cos_x)
+    }
+
+    // ========== Mathematical Constants ==========
+
+    /// Golden ratio φ = (1 + √5) / 2
+    pub fn phi(precision: u32) -> Self {
+        let five = Self::from_i64(5);
+        let sqrt5 = five.sqrt(precision + 10).unwrap_or(Self::from_i64(2));
+        let one = Self::from_i64(1);
+        let two = Self::from_i64(2);
+        one.add(&sqrt5).checked_div(&two).unwrap_or(Self::from_ratio(161803, 100000))
+    }
+
+    /// Pi - from high-precision string constant
+    pub fn pi(precision: u32) -> Self {
+        const PI_STR: &str = "3.14159265358979323846264338327950288419716939937510582097494459230781640628620899862803482534211706798214808651328230664709384460955058223172535940812848111745028410270193852110555964462294895493038196442881097566593344612847564823378678316527120190914564856692346034861045432664821339360726024914127372458700660631558817488152092096282925409171536436789259036001133053054882046652138414695194151160943305727036575959195309218611738193261179310511854807446237996274956735188575272489122793818301194912";
+        
+        let end_pos = (precision as usize + 2).min(PI_STR.len());
+        Self::from_str(&PI_STR[..end_pos])
+            .unwrap_or(Self::from_ratio(355, 113))
+    }
+
+    /// Euler's number e
+    pub fn e(precision: u32) -> Self {
+        Self::from_i64(1).exp(precision)
+    }
+
+    // ========== Other Operations ==========
+
+    /// Absolute value
+    pub fn abs(&self) -> Self {
+        Self { inner: Abs::abs(self.inner.clone()) }
+    }
+
+    /// Floor - largest integer <= x
+    pub fn floor(&self) -> Self {
+        Self { inner: self.inner.clone().floor() }
+    }
+
+    /// Ceiling - smallest integer >= x
+    pub fn ceil(&self) -> Self {
+        Self { inner: self.inner.clone().ceil() }
+    }
+
+    /// Try to convert to i64
+    pub fn to_i64(&self) -> Option<i64> {
+        if !self.is_integer() {
+            return None;
+        }
+        
+        // DBig stores as significand * 10^exponent
+        let (significand, exponent) = self.inner.clone().into_repr().into_parts();
+        
+        // Try to get i64 from significand
+        let sig_i64: i64 = significand.try_into().ok()?;
+        
+        if exponent == 0 {
+            Some(sig_i64)
+        } else if exponent > 0 && exponent <= 18 {
+            sig_i64.checked_mul(10_i64.checked_pow(exponent as u32)?)
+        } else if exponent < 0 && exponent >= -18 {
+            let divisor = 10_i64.checked_pow((-exponent) as u32)?;
+            if sig_i64 % divisor == 0 {
+                Some(sig_i64 / divisor)
+            } else {
+                None
+            }
+        } else {
+            // Fall back to f64 conversion
+            self.to_f64().and_then(|f| {
+                if f >= i64::MIN as f64 && f <= i64::MAX as f64 {
+                    Some(f as i64)
+                } else {
+                    None
+                }
+            })
+        }
+    }
+
+    // ========== Display ==========
+
+    /// Render as decimal string with specified decimal places
     pub fn as_decimal(&self, places: u32) -> String {
-        // Convert to f64 for display (may lose precision for very large numbers)
         if let Some(f) = self.to_f64() {
-            // Handle very small non-zero numbers that would display as all zeros
+            // Handle very small non-zero numbers
             if f != 0.0 && f.abs() < 1e-6 {
-                // Calculate how many decimal places needed for 3 significant digits
                 let log10 = f.abs().log10().floor() as i32;
-                let sig_places = ((-log10) + 2) as usize; // +2 for 3 sig figs
+                let sig_places = ((-log10) + 2) as usize;
                 return format!("{:.prec$}", f, prec = sig_places);
             }
 
@@ -468,12 +384,11 @@ impl Number {
                 format!("{:.prec$}", f, prec = places as usize)
             }
         } else {
-            format!("{}/{}", self.inner.numer(), self.inner.denom())
+            format!("{}", self.inner)
         }
     }
 
-    /// Render with N significant figures, using scientific notation when appropriate
-    /// Examples with sigfigs=4: 602214076e15 -> "6.022e23", 0.00123 -> "1.230e-3"
+    /// Render with N significant figures
     pub fn as_sigfigs(&self, sigfigs: u32) -> String {
         if let Some(f) = self.to_f64() {
             if f == 0.0 {
@@ -481,13 +396,9 @@ impl Number {
             }
 
             let sigfigs = sigfigs.max(1) as usize;
-
-            // Calculate the exponent (power of 10)
             let exp = f.abs().log10().floor() as i32;
 
-            // For numbers close to 1 (between 0.001 and 10000), use regular notation
             if exp >= -3 && exp <= 4 {
-                // Calculate decimal places needed for sigfigs
                 let decimal_places = if exp >= 0 {
                     (sigfigs as i32 - exp - 1).max(0) as usize
                 } else {
@@ -495,158 +406,67 @@ impl Number {
                 };
                 format!("{:.prec$}", f, prec = decimal_places)
             } else {
-                // Use scientific notation
                 let mantissa = f / 10_f64.powi(exp);
                 let decimal_places = (sigfigs - 1).max(0);
                 format!("{:.prec$}e{}", mantissa, exp, prec = decimal_places)
             }
         } else {
-            format!("{}/{}", self.inner.numer(), self.inner.denom())
+            format!("{}", self.inner)
         }
     }
 
-    /// Try to convert to f64
+    /// Convert to f64 (may lose precision)
     fn to_f64(&self) -> Option<f64> {
-        let numer = self.inner.numer();
-        let denom = self.inner.denom();
-
-        // First try direct conversion
-        if let (Some(n), Some(d)) = (numer.to_f64(), denom.to_f64()) {
-            if n.is_finite() && d.is_finite() && d != 0.0 {
-                let result = n / d;
-                if result.is_finite() {
-                    return Some(result);
+        // Get the representation: significand * 10^exponent
+        let (significand, exponent) = self.inner.clone().into_repr().into_parts();
+        
+        // Convert significand to f64
+        // For large significands, we need to be careful
+        let sig_f64: f64 = if significand.bit_len() <= 53 {
+            // Safe direct conversion
+            match TryInto::<i64>::try_into(significand.clone()) {
+                Ok(i) => i as f64,
+                Err(_) => {
+                    // Try as u64 then negate if needed
+                    let is_neg = significand < IBig::ZERO;
+                    let abs_sig = if is_neg { -significand.clone() } else { significand.clone() };
+                    match TryInto::<u64>::try_into(abs_sig) {
+                        Ok(u) => if is_neg { -(u as f64) } else { u as f64 },
+                        Err(_) => return None,
+                    }
                 }
             }
-        }
-
-        // Handle case where numerator and/or denominator overflow f64
-        // This happens with BigRational after many operations
-        let numer_bits = numer.bits() as i32;
-        let denom_bits = denom.bits() as i32;
-
-        if numer_bits == 0 {
-            return Some(0.0);
-        }
-
-        // The ratio n/d has magnitude approximately 2^(numer_bits - denom_bits)
-        // We need to shift to get both in range of f64 mantissa (53 bits)
-        // while preserving the relative magnitude
-
-        // Shift both to ~53 bits
-        let target_bits = 53i32;
-
-        // Shift numerator to target_bits
-        let numer_shift = (numer_bits - target_bits).max(0) as usize;
-        // Shift denominator to target_bits
-        let denom_shift = (denom_bits - target_bits).max(0) as usize;
-
-        let shifted_numer = numer >> numer_shift;
-        let shifted_denom = denom >> denom_shift;
-
-        if let (Some(n_f64), Some(d_f64)) = (shifted_numer.to_f64(), shifted_denom.to_f64()) {
-            if d_f64 != 0.0 {
-                // Compute the base ratio
-                let base_ratio = n_f64 / d_f64;
-
-                // Account for the different shift amounts
-                // We shifted numer by numer_shift and denom by denom_shift
-                // So the true value is base_ratio * 2^(numer_shift - denom_shift)
-                let shift_diff = numer_shift as i32 - denom_shift as i32;
-
-                let result = if shift_diff == 0 {
-                    base_ratio
-                } else if shift_diff > 0 && shift_diff < 1024 {
-                    base_ratio * 2_f64.powi(shift_diff)
-                } else if shift_diff < 0 && shift_diff > -1024 {
-                    base_ratio / 2_f64.powi(-shift_diff)
-                } else {
-                    // Shift too large for f64
-                    return None;
-                };
-
-                if result.is_finite() {
-                    return Some(result);
-                }
-            }
-        }
-
-        None
-    }
-
-    /// Check if value is an integer
-    pub fn is_integer(&self) -> bool {
-        self.inner.is_integer()
-    }
-
-    /// Try to convert to i64
-    pub fn to_i64(&self) -> Option<i64> {
-        if self.is_integer() {
-            self.inner.numer().to_i64()
+        } else {
+            // Significand too large - need to scale down
+            // Shift right to fit in 53 bits, adjusting exponent
+            let extra_bits = significand.bit_len() - 53;
+            let shifted = &significand >> extra_bits;
+            let shifted_i64: i64 = shifted.try_into().ok()?;
+            let base_f64 = shifted_i64 as f64;
+            // Account for the bits we shifted out
+            base_f64 * 2_f64.powi(extra_bits as i32)
+        };
+        
+        // Apply the decimal exponent
+        let result = if exponent == 0 {
+            sig_f64
+        } else if exponent > 0 && exponent <= 308 {
+            sig_f64 * 10_f64.powi(exponent as i32)
+        } else if exponent < 0 && exponent >= -308 {
+            sig_f64 / 10_f64.powi((-exponent) as i32)
+        } else {
+            return None; // Exponent out of f64 range
+        };
+        
+        if result.is_finite() {
+            Some(result)
         } else {
             None
         }
     }
-
-    /// Absolute value
-    pub fn abs(&self) -> Self {
-        Self { inner: self.inner.abs() }
-    }
-
-    /// Floor - largest integer less than or equal to x
-    pub fn floor(&self) -> Self {
-        Self { inner: self.inner.floor() }
-    }
-
-    /// Ceiling - smallest integer greater than or equal to x
-    pub fn ceil(&self) -> Self {
-        Self { inner: self.inner.ceil() }
-    }
-
-    /// Sine function using Taylor series
-    pub fn sin(&self, _precision: u32) -> Self {
-        // sin(x) = x - x^3/3! + x^5/5! - x^7/7! + ...
-        let mut sum = self.inner.clone();
-        let mut term = self.inner.clone();
-        let x_squared = &self.inner * &self.inner;
-
-        // Fixed 12 iterations - factorial denominator ensures fast convergence
-        let terms = 12;
-        for k in 1..terms {
-            term = -&term * &x_squared / BigRational::from(BigInt::from((2 * k) * (2 * k + 1)));
-            sum = &sum + &term;
-        }
-
-        Self { inner: sum }
-    }
-
-    /// Cosine function using Taylor series
-    pub fn cos(&self, _precision: u32) -> Self {
-        // cos(x) = 1 - x^2/2! + x^4/4! - x^6/6! + ...
-        let mut sum = BigRational::one();
-        let mut term = BigRational::one();
-        let x_squared = &self.inner * &self.inner;
-
-        // Fixed 12 iterations - factorial denominator ensures fast convergence
-        let terms = 12;
-        for k in 1..terms {
-            term = -&term * &x_squared / BigRational::from(BigInt::from((2 * k - 1) * (2 * k)));
-            sum = &sum + &term;
-        }
-
-        Self { inner: sum }
-    }
-
-    /// Tangent function (sin/cos)
-    pub fn tan(&self, precision: u32) -> Result<Self, NumberError> {
-        let cos_x = self.cos(precision);
-        if cos_x.is_zero() {
-            return Err(NumberError::DomainError("tan undefined at odd multiples of π/2".to_string()));
-        }
-        let sin_x = self.sin(precision);
-        sin_x.checked_div(&cos_x)
-    }
 }
+
+// ========== Trait Implementations ==========
 
 impl std::fmt::Display for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

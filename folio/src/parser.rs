@@ -14,8 +14,28 @@ pub fn parse(input: &str) -> Result<Document, FolioError> {
     
     for line in input.lines() {
         let line = line.trim();
-        
-        // Section header
+
+        // Section header - support both # and ## (# takes priority check first)
+        if line.starts_with("# ") && !line.starts_with("## ") {
+            // Single # header - treat as section
+            if let Some(mut sec) = current_section.take() {
+                sec.table.rows = std::mem::take(&mut table_rows);
+                sec.table.columns = std::mem::take(&mut columns);
+                sections.push(sec);
+            }
+
+            let header = &line[2..]; // Skip "# "
+            let (name, attrs) = parse_section_header(header);
+            current_section = Some(Section {
+                name,
+                attributes: attrs,
+                table: Table::default(),
+            });
+            in_table = false;
+            continue;
+        }
+
+        // Double ## section header
         if line.starts_with("## ") {
             // Save previous section
             if let Some(mut sec) = current_section.take() {
@@ -98,6 +118,13 @@ pub fn parse(input: &str) -> Result<Document, FolioError> {
         sec.table.rows = table_rows;
         sec.table.columns = columns;
         sections.push(sec);
+    } else if !table_rows.is_empty() {
+        // Fallback: create default section if there's content but no section header
+        sections.push(Section {
+            name: "Default".to_string(),
+            attributes: HashMap::new(),
+            table: Table { rows: table_rows, columns },
+        });
     }
 
     Ok(Document { sections })

@@ -25,8 +25,14 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 
-# Arbitrary precision
-# rug = "1.24"  # GMP-backed BigRational - only works on Linux/MSYS2
+# Arbitrary precision - dashu is pure Rust GMP/MPFR alternative
+dashu = "0.4"           # Meta-crate with all components
+dashu-base = "0.4"      # Base traits and Approximation type
+dashu-int = "0.4"       # Arbitrary precision integers
+dashu-ratio = "0.4"     # Exact rational arithmetic  
+dashu-float = "0.4"     # Arbitrary precision floats (for transcendentals)
+
+# Legacy - kept for transition, will be removed
 num-bigint = "0.4"
 num-rational = "0.4"
 num-traits = "0.2"

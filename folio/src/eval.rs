@@ -251,29 +251,42 @@ impl Evaluator {
     fn eval_expr(&self, expr: &Expr, ctx: &EvalContext) -> Value {
         match expr {
             Expr::Number(s) => self.parse_literal(s),
-            
+
             Expr::Variable(parts) => {
                 let name = parts.join(".");
-                ctx.get_var(&name)
+                let result = ctx.get_var(&name);
+                // Add variable name context to errors for better debugging
+                if let Value::Error(e) = result {
+                    Value::Error(e.with_note(&format!("when resolving '{}'", name)))
+                } else {
+                    result
+                }
             }
-            
+
             Expr::BinaryOp(left, op, right) => {
                 let l = self.eval_expr(left, ctx);
                 let r = self.eval_expr(right, ctx);
                 self.eval_binary_op(l, *op, r, ctx.precision)
             }
-            
+
             Expr::UnaryOp(op, inner) => {
                 let v = self.eval_expr(inner, ctx);
                 self.eval_unary_op(*op, v)
             }
-            
+
             Expr::FunctionCall(name, args) => {
                 let evaluated_args: Vec<Value> = args
                     .iter()
                     .map(|a| self.eval_expr(a, ctx))
                     .collect();
-                
+
+                // Check for errors in arguments and add function context
+                for (i, arg) in evaluated_args.iter().enumerate() {
+                    if let Value::Error(e) = arg {
+                        return Value::Error(e.clone().with_note(&format!("in argument {} of {}()", i + 1, name)));
+                    }
+                }
+
                 ctx.registry.call_function(name, &evaluated_args, ctx)
             }
         }

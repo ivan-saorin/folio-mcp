@@ -78,15 +78,32 @@ impl EvalContext {
         current
     }
 
-    /// Evaluate a constant's formula (e.g., "pi", "exp(1)", "(1 + sqrt(5)) / 2")
+    /// Evaluate a constant's formula (e.g., "pi", "exp(1)", "(1 + sqrt(5)) / 2", "0.51099895")
     fn eval_constant_formula(&self, formula: &str) -> Value {
-        // Handle simple function calls first
+        // First try: parse as numeric literal (handles "0.51099895", "1776.86", "299792458", etc.)
+        if let Ok(n) = folio_core::Number::from_str(formula) {
+            return Value::Number(n);
+        }
+
+        // Handle special computed formulas
         match formula {
             "pi" => Value::Number(folio_core::Number::pi(self.precision)),
             "exp(1)" => Value::Number(folio_core::Number::e(self.precision)),
             "(1 + sqrt(5)) / 2" => Value::Number(folio_core::Number::phi(self.precision)),
+            "sqrt(2)" => {
+                let two = folio_core::Number::from_i64(2);
+                two.sqrt(self.precision)
+                    .map(Value::Number)
+                    .unwrap_or_else(|e| Value::Error(e.into()))
+            }
+            "sqrt(3)" => {
+                let three = folio_core::Number::from_i64(3);
+                three.sqrt(self.precision)
+                    .map(Value::Number)
+                    .unwrap_or_else(|e| Value::Error(e.into()))
+            }
             _ => {
-                // Unknown formula - try calling as function
+                // Unknown formula
                 Value::Error(folio_core::FolioError::new("UNKNOWN_CONSTANT",
                     format!("Unknown constant formula: {}", formula)))
             }
