@@ -1,0 +1,43 @@
+<!-- ISIS Transform Analysis Template -->
+# ISIS Transform Analysis
+
+X(n) = -ln(n) × φ / (2π × ln(φ))
+X⁻¹(x) = exp(-x × 2π × ln(φ) / φ)
+
+Provide external variable `target` for the value to analyze.
+
+## Analysis @precision:100 @sigfigs:50
+
+| name | formula | result |
+|------|---------|--------|
+| phi | (1 + sqrt(5)) / 2 | |
+| ln_phi | ln(phi) | |
+| two_pi | 2 * π | |
+| scaling | phi / (two_pi * ln_phi) | |
+| target | 299792458 | |
+| ln_target | ln(target) | |
+| isis_x | 0 - ln_target * scaling | |
+
+## Inverse Verification @precision:100 @sigfigs:50
+
+| name | formula | result |
+|------|---------|--------|
+| inv_scaling | two_pi * ln_phi / phi | |
+| reconstructed | exp(0 - isis_x * inv_scaling) | |
+| error | target - reconstructed | |
+| relative_error | abs(error) / target | |
+
+## Phi-Power Analysis @precision:100 @sigfigs:12
+
+Finding nearest φ^k to target value.
+
+| name | formula | result |
+|------|---------|--------|
+| k_phi | ln_target / ln_phi | |
+| k_floor | floor(k_phi) | |
+| k_ceil | ceil(k_phi) | |
+| phi_floor | pow(phi, k_floor) | |
+| phi_ceil | pow(phi, k_ceil) | |
+| err_floor | abs(target - phi_floor) / target | |
+| err_ceil | abs(target - phi_ceil) / target | |
+| fractional_k | k_phi - k_floor | |

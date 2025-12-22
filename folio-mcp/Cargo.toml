@@ -1,0 +1,22 @@
+[package]
+name = "folio-mcp"
+description = "MCP Server for Folio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "folio-mcp"
+path = "src/main.rs"
+
+[dependencies]
+folio = { path = "../folio" }
+folio-core = { path = "../folio-core" }
+folio-plugin = { path = "../folio-plugin" }
+folio-std = { path = "../folio-std" }
+folio-isis = { path = "../folio-isis" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

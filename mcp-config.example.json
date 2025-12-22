@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "folio": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--name", "folio-mcp-claude",
+        "-e", "FOLIO_DATA_PATH=/app/folio",
+        "-v", "D:/projects2/projects/folio/data:/app/folio:ro",
+        "folio:latest"
+      ]
+    }
+  }
+}

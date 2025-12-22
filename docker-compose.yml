@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  folio-mcp:
+    build: .
+    container_name: folio-mcp
+    stdin_open: true
+    environment:
+      - FOLIO_DATA_PATH=/app/folio
+      - RUST_LOG=info
+    volumes:
+      - ./data:/app/folio:ro
+    # No ports needed - MCP uses stdio

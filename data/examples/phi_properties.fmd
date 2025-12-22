@@ -1,0 +1,30 @@
+<!-- Golden Ratio Properties and Identities -->
+# Golden Ratio (φ) Properties
+
+Demonstrating the remarkable properties of φ = (1 + √5) / 2
+
+## Golden Ratio Analysis @precision:50
+
+| name | formula | result |
+|------|---------|--------|
+| phi | (1 + sqrt(5)) / 2 | |
+| phi_inv | 1 / phi | |
+| phi_sq | phi * phi | |
+| identity_check | phi_sq - phi - 1 | |
+| reciprocal_check | phi_inv - (phi - 1) | |
+| phi_3 | pow(phi, 3) | |
+| phi_4 | pow(phi, 4) | |
+| phi_5 | pow(phi, 5) | |
+| phi_10 | pow(phi, 10) | |
+| fib_5 | 5 | |
+| fib_4 | 3 | |
+| phi_5_check | fib_5 * phi + fib_4 | |
+| phi_5_diff | phi_5 - phi_5_check | |
+| ln_phi | ln(phi) | |
+| two_pi | 2 * π | |
+| ln_phi_times_2pi | ln_phi * two_pi | |
+
+Key properties verified:
+- φ² = φ + 1 (identity_check should be ~0)
+- 1/φ = φ - 1 (reciprocal_check should be ~0)
+- φⁿ = F(n)×φ + F(n-1) (phi_5_diff should be ~0)

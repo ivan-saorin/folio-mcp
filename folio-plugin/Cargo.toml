@@ -1,0 +1,12 @@
+[package]
+name = "folio-plugin"
+description = "Plugin system for Folio: traits and registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+folio-core = { path = "../folio-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }

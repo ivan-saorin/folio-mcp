@@ -1,0 +1,37 @@
+<!-- Unit Conversion Calculator -->
+# Unit Conversions
+
+Common unit conversion calculations with exact values.
+
+## Length Conversions @precision:30
+
+| name | formula | result |
+|------|---------|--------|
+| meters | 1 | |
+| feet | meters * 3.28084 | |
+| inches | meters * 39.3701 | |
+| miles | meters / 1609.344 | |
+| km | meters / 1000 | |
+
+## Temperature Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| celsius | 100 | |
+| fahrenheit | celsius * 9/5 + 32 | |
+| kelvin | celsius + 273.15 | |
+
+## Physical Constants @precision:50 @sigfigs:6
+
+Using integer-mantissa notation for full precision.
+
+| name | formula | result |
+|------|---------|--------|
+| c | 299792458 | |
+| h | 662607015e-42 | |
+| e_charge | 1602176634e-28 | |
+| avogadro | 602214076e15 | |
+| boltzmann | 1380649e-29 | |
+| mass_kg | 1 | |
+| energy_j | mass_kg * c * c | |
+| energy_ev | energy_j / e_charge | |

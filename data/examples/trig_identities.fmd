@@ -1,0 +1,38 @@
+<!-- Trigonometric Identities Verification -->
+# Trigonometric Identities
+
+Verifying fundamental trig identities with arbitrary precision.
+
+## Trig Calculations @precision:50
+
+| name | formula | result |
+|------|---------|--------|
+| pi | π | |
+| pi_2 | π / 2 | |
+| pi_4 | π / 4 | |
+| pi_6 | π / 6 | |
+| x | pi_4 | |
+| sin_x | sin(x) | |
+| cos_x | cos(x) | |
+| sin_sq | sin_x * sin_x | |
+| cos_sq | cos_x * cos_x | |
+| pyth_check | sin_sq + cos_sq | |
+| pyth_error | pyth_check - 1 | |
+| sin_0 | sin(0) | |
+| cos_0 | cos(0) | |
+| sin_pi_2 | sin(pi_2) | |
+| cos_pi_2 | cos(pi_2) | |
+| sin_pi_6 | sin(pi_6) | |
+| tan_pi_4 | tan(pi_4) | |
+| double_x | 2 * x | |
+| sin_2x | sin(double_x) | |
+| double_formula | 2 * sin_x * cos_x | |
+| double_check | sin_2x - double_formula | |
+
+Identities verified:
+- sin²(x) + cos²(x) = 1 (pyth_error should be ~0)
+- sin(2x) = 2·sin(x)·cos(x) (double_check should be ~0)
+- sin(0) = 0, cos(0) = 1
+- sin(π/2) = 1, cos(π/2) = 0
+- sin(π/6) = 0.5
+- tan(π/4) = 1

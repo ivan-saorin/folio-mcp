@@ -1,0 +1,28 @@
+<!-- Compound Interest Calculator -->
+# Compound Interest Calculator
+
+A = P(1 + r/n)^(nt)
+
+## Variables
+
+- `principal`: Initial investment
+- `rate`: Annual interest rate (decimal)
+- `years`: Time period
+- `compounds`: Compounding frequency per year
+
+## Calculation @precision:20
+
+| name | formula | result |
+|------|---------|--------|
+| principal | 10000 | |
+| rate | 0.07 | |
+| years | 10 | |
+| compounds | 12 | |
+| periodic_rate | rate / compounds | |
+| total_periods | compounds * years | |
+| growth_factor | pow(1 + periodic_rate, total_periods) | |
+| final_amount | principal * growth_factor | |
+| interest_earned | final_amount - principal | |
+| ear | pow(1 + rate / compounds, compounds) - 1 | |
+| continuous_amount | principal * exp(rate * years) | |
+| continuous_diff | continuous_amount - final_amount | |

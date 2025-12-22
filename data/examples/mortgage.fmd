@@ -1,0 +1,38 @@
+<!-- Mortgage Payment Calculator -->
+# Mortgage Calculator
+
+Calculate monthly payment, total cost, and interest for a fixed-rate mortgage.
+
+## External Variables
+
+Provide these when calling:
+- `principal`: Loan amount (default: 300000)
+- `rate`: Annual interest rate as decimal (default: 0.065 for 6.5%)
+- `years`: Loan term in years (default: 30)
+
+## Calculation @precision:20
+
+| name | formula | result |
+|------|---------|--------|
+| principal | 300000 | |
+| annual_rate | 0.065 | |
+| years | 30 | |
+| monthly_rate | annual_rate / 12 | |
+| months | years * 12 | |
+| payment | principal * monthly_rate * pow(1 + monthly_rate, months) / (pow(1 + monthly_rate, months) - 1) | |
+| total_paid | payment * months | |
+| total_interest | total_paid - principal | |
+| interest_ratio | total_interest / principal | |
+
+## Notes
+
+The payment formula is:
+```
+M = P * r * (1+r)^n / ((1+r)^n - 1)
+```
+
+Where:
+- M = monthly payment
+- P = principal
+- r = monthly interest rate
+- n = number of payments

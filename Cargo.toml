@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "folio-core",
+    "folio-plugin",
+    "folio-std",
+    "folio",
+    "folio-mcp",
+    "folio-isis",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/yourname/folio"
+authors = ["Ivan <ivan@example.com>"]
+
+[workspace.dependencies]
+# Shared dependencies across workspace
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Arbitrary precision
+# rug = "1.24"  # GMP-backed BigRational - only works on Linux/MSYS2
+num-bigint = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"
+
+# Parsing
+pest = "2.7"
+pest_derive = "2.7"
+
+# MCP
+async-trait = "0.1"
