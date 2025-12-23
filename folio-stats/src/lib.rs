@@ -14,6 +14,10 @@ mod distributions;
 mod hypothesis;
 mod confidence;
 mod transform;
+mod histogram;
+mod outliers;
+mod goodness;
+mod qq;
 
 use folio_plugin::PluginRegistry;
 
@@ -48,6 +52,7 @@ pub fn load_stats_library(registry: PluginRegistry) -> PluginRegistry {
         .with_function(position::Q1)
         .with_function(position::Q3)
         .with_function(position::Rank)
+        .with_function(position::Ranks)
         .with_function(position::Zscore)
 
         // Shape
@@ -115,4 +120,25 @@ pub fn load_stats_library(registry: PluginRegistry) -> PluginRegistry {
         .with_function(transform::Lag)
         .with_function(transform::MovingAvg)
         .with_function(transform::Ewma)
+
+        // Histogram & Binning
+        .with_function(histogram::Histogram)
+        .with_function(histogram::BinEdges)
+        .with_function(histogram::Frequency)
+
+        // Outlier Detection
+        .with_function(outliers::OutliersIqr)
+        .with_function(outliers::OutliersZscore)
+        .with_function(outliers::OutliersMad)
+        .with_function(outliers::GrubbsTest)
+
+        // Goodness-of-Fit Tests
+        .with_function(goodness::JarqueBera)
+        .with_function(goodness::ShapiroWilk)
+        .with_function(goodness::IsNormal)
+        .with_function(goodness::KsTest2)
+
+        // Q-Q Analysis
+        .with_function(qq::QQPoints)
+        .with_function(qq::QQResiduals)
 }

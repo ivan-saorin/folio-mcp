@@ -329,24 +329,34 @@ impl FunctionPlugin for RSquared {
 
 pub struct Predict;
 
-static PREDICT_ARGS: [ArgMeta; 2] = [
+static PREDICT_ARGS: [ArgMeta; 3] = [
     ArgMeta {
-        name: "reg",
-        typ: "Object",
-        description: "Regression result from linear_reg()",
+        name: "x_or_reg",
+        typ: "List|Object",
+        description: "X values list OR regression object",
         optional: false,
         default: None,
     },
     ArgMeta {
-        name: "x",
-        typ: "Number",
-        description: "X value to predict",
+        name: "y_or_x",
+        typ: "List|Number",
+        description: "Y values list OR x value to predict",
         optional: false,
+        default: None,
+    },
+    ArgMeta {
+        name: "new_x",
+        typ: "Number",
+        description: "X value to predict (only for 3-arg form)",
+        optional: true,
         default: None,
     },
 ];
 
-static PREDICT_EXAMPLES: [&str; 1] = ["predict(linear_reg([1,2,3], [2,4,6]), 4) → 8"];
+static PREDICT_EXAMPLES: [&str; 2] = [
+    "predict([1,2,3], [2,4,6], 4) → 8",
+    "predict(linear_reg([1,2,3], [2,4,6]), 4) → 8",
+];
 
 static PREDICT_RELATED: [&str; 2] = ["linear_reg", "residuals"];
 
@@ -354,8 +364,8 @@ impl FunctionPlugin for Predict {
     fn meta(&self) -> FunctionMeta {
         FunctionMeta {
             name: "predict",
-            description: "Predict y from regression object",
-            usage: "predict(reg, x)",
+            description: "Predict y value from linear regression (3-arg: x, y, new_x) or (2-arg: reg, x)",
+            usage: "predict(x_vals, y_vals, new_x) or predict(reg, x)",
             args: &PREDICT_ARGS,
             returns: "Number",
             examples: &PREDICT_EXAMPLES,
@@ -365,11 +375,44 @@ impl FunctionPlugin for Predict {
         }
     }
 
-    fn call(&self, args: &[Value], _ctx: &EvalContext) -> Value {
-        if args.len() != 2 {
-            return Value::Error(FolioError::arg_count("predict", 2, args.len()));
+    fn call(&self, args: &[Value], ctx: &EvalContext) -> Value {
+        if args.len() < 2 || args.len() > 3 {
+            return Value::Error(FolioError::new("ARG_COUNT",
+                "predict requires 2 or 3 arguments: predict(x, y, new_x) or predict(reg, x)"));
         }
 
+        // 3-arg form: predict(x_vals, y_vals, new_x)
+        if args.len() == 3 {
+            // First compute linear regression, then predict
+            let linear_reg = LinearReg;
+            let reg_result = linear_reg.call(&args[0..2], ctx);
+
+            let reg = match &reg_result {
+                Value::Object(obj) => obj,
+                Value::Error(e) => return Value::Error(e.clone()),
+                _ => return Value::Error(FolioError::new("REGRESSION_ERROR", "Failed to compute regression")),
+            };
+
+            let new_x = match &args[2] {
+                Value::Number(n) => n,
+                Value::Error(e) => return Value::Error(e.clone()),
+                other => return Value::Error(FolioError::arg_type("predict", "new_x", "Number", other.type_name())),
+            };
+
+            let slope = match reg.get("slope") {
+                Some(Value::Number(n)) => n,
+                _ => return Value::Error(FolioError::undefined_field("slope")),
+            };
+
+            let intercept = match reg.get("intercept") {
+                Some(Value::Number(n)) => n,
+                _ => return Value::Error(FolioError::undefined_field("intercept")),
+            };
+
+            return Value::Number(intercept.add(&slope.mul(new_x)));
+        }
+
+        // 2-arg form: predict(reg, x)
         let reg = match &args[0] {
             Value::Object(obj) => obj,
             Value::Error(e) => return Value::Error(e.clone()),

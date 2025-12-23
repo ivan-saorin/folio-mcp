@@ -484,6 +484,61 @@ impl FunctionPlugin for Zscore {
     }
 }
 
+// ============ Ranks ============
+
+pub struct Ranks;
+
+static RANKS_ARGS: [ArgMeta; 1] = [
+    ArgMeta {
+        name: "list",
+        typ: "List<Number>",
+        description: "Values to rank",
+        optional: false,
+        default: None,
+    },
+];
+
+static RANKS_EXAMPLES: [&str; 2] = [
+    "ranks([45, 23, 67, 89]) → [2, 1, 3, 4]",
+    "ranks([5, 3, 5, 1]) → [3.5, 2, 3.5, 1]  // ties get average rank",
+];
+
+static RANKS_RELATED: [&str; 2] = ["rank", "percentile"];
+
+impl FunctionPlugin for Ranks {
+    fn meta(&self) -> FunctionMeta {
+        FunctionMeta {
+            name: "ranks",
+            description: "Compute ranks for all values in list (1-indexed, average for ties)",
+            usage: "ranks(list)",
+            args: &RANKS_ARGS,
+            returns: "List",
+            examples: &RANKS_EXAMPLES,
+            category: "stats/position",
+            source: None,
+            related: &RANKS_RELATED,
+        }
+    }
+
+    fn call(&self, args: &[Value], _ctx: &EvalContext) -> Value {
+        if args.len() != 1 {
+            return Value::Error(FolioError::arg_count("ranks", 1, args.len()));
+        }
+
+        let numbers = match extract_numbers(&args[0..1]) {
+            Ok(n) => n,
+            Err(e) => return Value::Error(e),
+        };
+
+        if let Err(e) = require_non_empty(&numbers, "ranks") {
+            return Value::Error(e);
+        }
+
+        let ranked = ranks(&numbers);
+        Value::List(ranked.into_iter().map(Value::Number).collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
