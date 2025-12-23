@@ -514,4 +514,168 @@ mod tests {
         assert!(!y.is_error(), "y should resolve to 10");
         assert_eq!(y.as_number().unwrap().to_i64(), Some(10));
     }
+
+    #[test]
+    fn test_datetime_shortcuts() {
+        let folio = test_folio();
+        let doc = r#"
+## DateTime Shortcuts Test
+| name | formula | result |
+|------|---------|--------|
+| ref_date | date(2025, 6, 15) | |
+| end_of_day | eod(ref_date) | |
+| end_of_month | eom(ref_date) | |
+| start_of_month | som(ref_date) | |
+| tomorrow_date | tomorrow(ref_date) | |
+| next_week_start | nextWeek(ref_date) | |
+| next_month_first | nextMonth(ref_date) | |
+| is_workday_check | isWorkday(ref_date) | |
+| next_workday_date | nextWorkday(ref_date) | |
+| add_5_workdays | addWorkdays(ref_date, 5) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // All values should exist and not be errors
+        assert!(!result.values.get("ref_date").unwrap().is_error(), "ref_date failed");
+        assert!(!result.values.get("end_of_day").unwrap().is_error(), "eod failed");
+        assert!(!result.values.get("end_of_month").unwrap().is_error(), "eom failed");
+        assert!(!result.values.get("start_of_month").unwrap().is_error(), "som failed");
+        assert!(!result.values.get("tomorrow_date").unwrap().is_error(), "tomorrow failed");
+        assert!(!result.values.get("next_week_start").unwrap().is_error(), "nextWeek failed");
+        assert!(!result.values.get("next_month_first").unwrap().is_error(), "nextMonth failed");
+        assert!(!result.values.get("is_workday_check").unwrap().is_error(), "isWorkday failed");
+        assert!(!result.values.get("next_workday_date").unwrap().is_error(), "nextWorkday failed");
+        assert!(!result.values.get("add_5_workdays").unwrap().is_error(), "addWorkdays failed");
+
+        // June 15, 2025 is a Sunday, so it's not a workday
+        let is_wd = result.values.get("is_workday_check").unwrap();
+        assert_eq!(is_wd.as_bool().unwrap(), false, "June 15, 2025 is Sunday, not a workday");
+
+        // End of month should be June 30
+        let eom_dt = result.values.get("end_of_month").unwrap().as_datetime().unwrap();
+        assert_eq!(eom_dt.day(), 30, "End of June should be day 30");
+        assert_eq!(eom_dt.month(), 6);
+
+        // Start of month should be June 1
+        let som_dt = result.values.get("start_of_month").unwrap().as_datetime().unwrap();
+        assert_eq!(som_dt.day(), 1, "Start of June should be day 1");
+
+        // Tomorrow should be June 16
+        let tom_dt = result.values.get("tomorrow_date").unwrap().as_datetime().unwrap();
+        assert_eq!(tom_dt.day(), 16);
+
+        // Next month should be July 1
+        let nm_dt = result.values.get("next_month_first").unwrap().as_datetime().unwrap();
+        assert_eq!(nm_dt.month(), 7);
+        assert_eq!(nm_dt.day(), 1);
+    }
+
+    #[test]
+    fn test_datetime_workdays() {
+        let folio = test_folio();
+        let doc = r#"
+## Workday Tests
+| name | formula | result |
+|------|---------|--------|
+| friday | date(2025, 6, 13) | |
+| saturday | date(2025, 6, 14) | |
+| sunday | date(2025, 6, 15) | |
+| monday | date(2025, 6, 16) | |
+| fri_is_wd | isWorkday(friday) | |
+| sat_is_wd | isWorkday(saturday) | |
+| sun_is_wd | isWorkday(sunday) | |
+| mon_is_wd | isWorkday(monday) | |
+| next_from_fri | nextWorkday(friday) | |
+| next_from_sat | nextWorkday(saturday) | |
+| prev_from_sat | prevWorkday(saturday) | |
+| add_5_from_fri | addWorkdays(friday, 5) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // Friday is a workday
+        assert_eq!(result.values.get("fri_is_wd").unwrap().as_bool().unwrap(), true);
+        // Saturday is not a workday
+        assert_eq!(result.values.get("sat_is_wd").unwrap().as_bool().unwrap(), false);
+        // Sunday is not a workday
+        assert_eq!(result.values.get("sun_is_wd").unwrap().as_bool().unwrap(), false);
+        // Monday is a workday
+        assert_eq!(result.values.get("mon_is_wd").unwrap().as_bool().unwrap(), true);
+
+        // Next workday from Friday is Monday (June 16)
+        let next_fri = result.values.get("next_from_fri").unwrap().as_datetime().unwrap();
+        assert_eq!(next_fri.day(), 16);
+
+        // Next workday from Saturday is Monday (June 16)
+        let next_sat = result.values.get("next_from_sat").unwrap().as_datetime().unwrap();
+        assert_eq!(next_sat.day(), 16);
+
+        // Previous workday from Saturday is Friday (June 13)
+        let prev_sat = result.values.get("prev_from_sat").unwrap().as_datetime().unwrap();
+        assert_eq!(prev_sat.day(), 13);
+
+        // Add 5 workdays from Friday (June 13): Mon(16), Tue(17), Wed(18), Thu(19), Fri(20)
+        let add5 = result.values.get("add_5_from_fri").unwrap().as_datetime().unwrap();
+        assert_eq!(add5.day(), 20);
+    }
+
+    #[test]
+    fn test_duration_time_units() {
+        let folio = test_folio();
+        let doc = r#"
+## Duration Time Units Test
+| name | formula | result |
+|------|---------|--------|
+| two_weeks | weeks(2) | |
+| half_second | milliseconds(500) | |
+| fourteen_days | days(14) | |
+| week_in_days | two_weeks / days(1) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // weeks(2) should work and divide to 14 days
+        let week_days = result.values.get("week_in_days").unwrap();
+        assert!(!week_days.is_error(), "weeks calculation should work, got: {:?}", week_days);
+        assert_eq!(week_days.as_number().unwrap().to_i64(), Some(14));
+
+        // milliseconds(500) should work
+        let half_sec = result.values.get("half_second").unwrap();
+        assert!(!half_sec.is_error(), "milliseconds() should work, got: {:?}", half_sec);
+    }
+
+    #[test]
+    fn test_string_literals() {
+        let folio = test_folio();
+        let doc = r#"
+## String Literals Test
+| name | formula | result |
+|------|---------|--------|
+| start_date | date(2025, 1, 15) | |
+| end_date | date(2025, 6, 30) | |
+| days_diff | diff(end_date, start_date, "days") | |
+| hours_diff | diff(end_date, start_date, "hours") | |
+| months_diff | diff(end_date, start_date, "months") | |
+| formatted | formatDate(start_date, "MM/DD/YYYY") | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // diff with "days" should work
+        let days = result.values.get("days_diff").unwrap();
+        assert!(!days.is_error(), "diff with 'days' should work, got: {:?}", days);
+        assert_eq!(days.as_number().unwrap().to_i64(), Some(166));
+
+        // diff with "hours" should work
+        let hours = result.values.get("hours_diff").unwrap();
+        assert!(!hours.is_error(), "diff with 'hours' should work, got: {:?}", hours);
+        assert_eq!(hours.as_number().unwrap().to_i64(), Some(166 * 24));
+
+        // diff with "months" should work
+        let months = result.values.get("months_diff").unwrap();
+        assert!(!months.is_error(), "diff with 'months' should work, got: {:?}", months);
+        assert_eq!(months.as_number().unwrap().to_i64(), Some(5));
+
+        // formatDate should work
+        let formatted = result.values.get("formatted").unwrap();
+        assert!(!formatted.is_error(), "formatDate with pattern should work, got: {:?}", formatted);
+        assert_eq!(formatted.as_text().unwrap(), "01/15/2025");
+    }
 }

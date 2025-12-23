@@ -1,0 +1,49 @@
+<!-- Workday Functions Example -->
+# Workday Functions
+
+Calculate payment due dates and working day schedules.
+
+## Invoice Terms @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| invoice_date | date(2025, 6, 1) | |
+| is_workday_check | isWorkday(invoice_date) | |
+| net_30_calendar | addDays(invoice_date, 30) | |
+| net_30_workdays | addWorkdays(invoice_date, 30) | |
+| days_between | diff(net_30_workdays, net_30_calendar, "days") | |
+
+## Weekend Handling @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| friday | date(2025, 6, 13) | |
+| friday_weekday | weekday(friday) | |
+| saturday | date(2025, 6, 14) | |
+| saturday_weekday | weekday(saturday) | |
+| is_friday_workday | isWorkday(friday) | |
+| is_saturday_workday | isWorkday(saturday) | |
+| next_from_friday | nextWorkday(friday) | |
+| next_from_saturday | nextWorkday(saturday) | |
+| prev_from_saturday | prevWorkday(saturday) | |
+
+## Monthly Payment Schedule @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| reference | date(2025, 6, 15) | |
+| jul_first | nextMonth(reference) | |
+| jul_first_wd | nextMonthWd(reference) | |
+| jul_1_weekday | weekday(jul_first) | |
+| aug_first | nextMonth(jul_first) | |
+| aug_first_wd | nextMonthWd(jul_first) | |
+
+## Year End Payment @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| dec_ref | date(2025, 12, 15) | |
+| dec_end | eom(dec_ref) | |
+| jan_first | nextMonth(dec_ref) | |
+| jan_first_wd | nextMonthWd(dec_ref) | |
+| jan_1_weekday | weekday(jan_first) | |

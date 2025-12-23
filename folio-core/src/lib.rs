@@ -2,20 +2,25 @@
 //!
 //! This crate provides the core types used throughout Folio:
 //! - `Number`: Arbitrary precision rational numbers
-//! - `Value`: Runtime values (numbers, text, objects, errors)
+//! - `Value`: Runtime values (numbers, text, datetime, duration, objects, errors)
+//! - `FolioDateTime`: Nanosecond-precision datetime
+//! - `FolioDuration`: Nanosecond-precision duration
 //! - `FolioError`: Structured errors for LLM consumption
 
 mod number;
 mod value;
 mod error;
+mod datetime;
 
 pub use number::{Number, NumberError};
 pub use value::Value;
 pub use error::{FolioError, ErrorContext, Severity, codes};
+pub use datetime::{FolioDateTime, FolioDuration, DateTimeError, is_leap_year, days_in_month};
 
 /// Prelude for convenient imports
 pub mod prelude {
     pub use crate::{Number, Value, FolioError, Severity};
+    pub use crate::{FolioDateTime, FolioDuration, DateTimeError};
     pub use crate::error::codes;
 }
 

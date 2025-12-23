@@ -1,9 +1,10 @@
 //! Runtime values in Folio
 //!
-//! Values can be numbers, text, booleans, objects (for DECOMPOSE results),
-//! lists, null, or errors. Errors propagate through computations.
+//! Values can be numbers, text, booleans, datetime, duration, objects
+//! (for DECOMPOSE results), lists, null, or errors. Errors propagate
+//! through computations.
 
-use crate::{Number, FolioError};
+use crate::{Number, FolioError, FolioDateTime, FolioDuration};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -14,6 +15,8 @@ pub enum Value {
     Number(Number),
     Text(String),
     Bool(bool),
+    DateTime(FolioDateTime),
+    Duration(FolioDuration),
     Object(HashMap<String, Value>),
     List(Vec<Value>),
     Null,
@@ -57,13 +60,35 @@ impl Value {
             _ => None,
         }
     }
-    
+
+    pub fn as_datetime(&self) -> Option<&FolioDateTime> {
+        match self {
+            Value::DateTime(dt) => Some(dt),
+            _ => None,
+        }
+    }
+
+    pub fn as_duration(&self) -> Option<&FolioDuration> {
+        match self {
+            Value::Duration(d) => Some(d),
+            _ => None,
+        }
+    }
+
     pub fn is_error(&self) -> bool {
         matches!(self, Value::Error(_))
     }
-    
+
     pub fn is_null(&self) -> bool {
         matches!(self, Value::Null)
+    }
+
+    pub fn is_datetime(&self) -> bool {
+        matches!(self, Value::DateTime(_))
+    }
+
+    pub fn is_duration(&self) -> bool {
+        matches!(self, Value::Duration(_))
     }
     
     // ========== Object Field Access ==========
@@ -87,6 +112,8 @@ impl Value {
             Value::Number(_) => "Number",
             Value::Text(_) => "Text",
             Value::Bool(_) => "Bool",
+            Value::DateTime(_) => "DateTime",
+            Value::Duration(_) => "Duration",
             Value::Object(_) => "Object",
             Value::List(_) => "List",
             Value::Null => "Null",
@@ -123,10 +150,52 @@ impl Value {
             Value::Bool(b) => Value::Bool(*b),
             Value::Number(n) => Value::Bool(!n.is_zero()),
             Value::Text(s) => Value::Bool(!s.is_empty()),
+            Value::DateTime(_) => Value::Bool(true), // DateTime is always truthy
+            Value::Duration(d) => Value::Bool(!d.is_zero()),
             Value::Null => Value::Bool(false),
             Value::List(l) => Value::Bool(!l.is_empty()),
             Value::Object(o) => Value::Bool(!o.is_empty()),
             Value::Error(e) => Value::Error(e.clone()),
+        }
+    }
+
+    /// Convert to datetime (may return Error)
+    pub fn to_datetime(&self) -> Value {
+        match self {
+            Value::DateTime(dt) => Value::DateTime(dt.clone()),
+            Value::Text(s) => {
+                match FolioDateTime::parse(s) {
+                    Ok(dt) => Value::DateTime(dt),
+                    Err(e) => Value::Error(FolioError::parse_error(format!("{}", e))),
+                }
+            }
+            Value::Number(n) => {
+                // Interpret as Unix timestamp in seconds
+                if let Some(secs) = n.to_i64() {
+                    Value::DateTime(FolioDateTime::from_unix_secs(secs))
+                } else {
+                    Value::Error(FolioError::type_error("DateTime", "Number (out of range)"))
+                }
+            }
+            Value::Error(e) => Value::Error(e.clone()),
+            _ => Value::Error(FolioError::type_error("DateTime", self.type_name())),
+        }
+    }
+
+    /// Convert to duration (may return Error)
+    pub fn to_duration(&self) -> Value {
+        match self {
+            Value::Duration(d) => Value::Duration(d.clone()),
+            Value::Number(n) => {
+                // Interpret as seconds
+                if let Some(secs) = n.to_i64() {
+                    Value::Duration(FolioDuration::from_secs(secs))
+                } else {
+                    Value::Error(FolioError::type_error("Duration", "Number (out of range)"))
+                }
+            }
+            Value::Error(e) => Value::Error(e.clone()),
+            _ => Value::Error(FolioError::type_error("Duration", self.type_name())),
         }
     }
 }
@@ -137,6 +206,8 @@ impl std::fmt::Display for Value {
             Value::Number(n) => write!(f, "{}", n),
             Value::Text(s) => write!(f, "{}", s),
             Value::Bool(b) => write!(f, "{}", b),
+            Value::DateTime(dt) => write!(f, "{}", dt),
+            Value::Duration(d) => write!(f, "{}", d),
             Value::Object(_) => write!(f, "[Object]"),
             Value::List(l) => write!(f, "[List({})]", l.len()),
             Value::Null => write!(f, "null"),
@@ -179,5 +250,17 @@ impl From<bool> for Value {
 impl From<Number> for Value {
     fn from(n: Number) -> Self {
         Value::Number(n)
+    }
+}
+
+impl From<FolioDateTime> for Value {
+    fn from(dt: FolioDateTime) -> Self {
+        Value::DateTime(dt)
+    }
+}
+
+impl From<FolioDuration> for Value {
+    fn from(d: FolioDuration) -> Self {
+        Value::Duration(d)
     }
 }

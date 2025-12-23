@@ -227,8 +227,10 @@ pub fn parse_expr(input: &str) -> Result<Expr, FolioError> {
 }
 
 fn parse_additive(input: &str) -> Result<Expr, FolioError> {
-    // Find + or - not inside parentheses or function calls
+    // Find + or - not inside parentheses, function calls, or quotes
     let mut depth = 0;
+    let mut in_double_quote = false;
+    let mut in_single_quote = false;
 
     // Collect (byte_offset, char) pairs to handle multi-byte UTF-8 correctly
     let char_indices: Vec<(usize, char)> = input.char_indices().collect();
@@ -236,9 +238,11 @@ fn parse_additive(input: &str) -> Result<Expr, FolioError> {
     for idx in (0..char_indices.len()).rev() {
         let (byte_pos, c) = char_indices[idx];
         match c {
-            ')' => depth += 1,
-            '(' => depth -= 1,
-            '+' | '-' if depth == 0 && idx > 0 => {
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            ')' if !in_double_quote && !in_single_quote => depth += 1,
+            '(' if !in_double_quote && !in_single_quote => depth -= 1,
+            '+' | '-' if depth == 0 && idx > 0 && !in_double_quote && !in_single_quote => {
                 let left = input[..byte_pos].trim();
                 let right = input[byte_pos + c.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -259,6 +263,8 @@ fn parse_additive(input: &str) -> Result<Expr, FolioError> {
 
 fn parse_multiplicative(input: &str) -> Result<Expr, FolioError> {
     let mut depth = 0;
+    let mut in_double_quote = false;
+    let mut in_single_quote = false;
 
     // Collect (byte_offset, char) pairs to handle multi-byte UTF-8 correctly
     let char_indices: Vec<(usize, char)> = input.char_indices().collect();
@@ -266,9 +272,11 @@ fn parse_multiplicative(input: &str) -> Result<Expr, FolioError> {
     for idx in (0..char_indices.len()).rev() {
         let (byte_pos, c) = char_indices[idx];
         match c {
-            ')' => depth += 1,
-            '(' => depth -= 1,
-            '*' | '/' if depth == 0 => {
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            ')' if !in_double_quote && !in_single_quote => depth += 1,
+            '(' if !in_double_quote && !in_single_quote => depth -= 1,
+            '*' | '/' if depth == 0 && !in_double_quote && !in_single_quote => {
                 let left = input[..byte_pos].trim();
                 let right = input[byte_pos + c.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -289,6 +297,8 @@ fn parse_multiplicative(input: &str) -> Result<Expr, FolioError> {
 
 fn parse_power(input: &str) -> Result<Expr, FolioError> {
     let mut depth = 0;
+    let mut in_double_quote = false;
+    let mut in_single_quote = false;
 
     // Collect (byte_offset, char) pairs to handle multi-byte UTF-8 correctly
     let char_indices: Vec<(usize, char)> = input.char_indices().collect();
@@ -296,9 +306,11 @@ fn parse_power(input: &str) -> Result<Expr, FolioError> {
     for idx in 0..char_indices.len() {
         let (byte_pos, c) = char_indices[idx];
         match c {
-            '(' => depth += 1,
-            ')' => depth -= 1,
-            '^' if depth == 0 => {
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            '(' if !in_double_quote && !in_single_quote => depth += 1,
+            ')' if !in_double_quote && !in_single_quote => depth -= 1,
+            '^' if depth == 0 && !in_double_quote && !in_single_quote => {
                 let left = input[..byte_pos].trim();
                 let right = input[byte_pos + c.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -318,12 +330,24 @@ fn parse_power(input: &str) -> Result<Expr, FolioError> {
 
 fn parse_primary(input: &str) -> Result<Expr, FolioError> {
     let input = input.trim();
-    
+
+    // String literal (double-quoted)
+    if input.starts_with('"') && input.ends_with('"') && input.len() >= 2 {
+        let content = &input[1..input.len()-1];
+        return Ok(Expr::StringLiteral(content.to_string()));
+    }
+
+    // String literal (single-quoted) - also support single quotes
+    if input.starts_with('\'') && input.ends_with('\'') && input.len() >= 2 {
+        let content = &input[1..input.len()-1];
+        return Ok(Expr::StringLiteral(content.to_string()));
+    }
+
     // Parentheses
     if input.starts_with('(') && input.ends_with(')') {
         return parse_expr(&input[1..input.len()-1]);
     }
-    
+
     // Function call
     if let Some(paren_pos) = input.find('(') {
         if input.ends_with(')') {
@@ -333,14 +357,14 @@ fn parse_primary(input: &str) -> Result<Expr, FolioError> {
             return Ok(Expr::FunctionCall(func_name, args));
         }
     }
-    
+
     // Number
     if input.chars().next().map_or(false, |c| c.is_ascii_digit() || c == '-' || c == '.') {
         if input.parse::<f64>().is_ok() || input.contains('/') {
             return Ok(Expr::Number(input.to_string()));
         }
     }
-    
+
     // Variable (possibly dotted)
     let parts: Vec<String> = input.split('.').map(|s| s.trim().to_string()).collect();
     Ok(Expr::Variable(parts))
@@ -353,14 +377,18 @@ fn parse_args(input: &str) -> Result<Vec<Expr>, FolioError> {
 
     let mut args = Vec::new();
     let mut depth = 0;
+    let mut in_double_quote = false;
+    let mut in_single_quote = false;
     let mut current_start = 0;
 
     // Use char_indices for proper UTF-8 handling
     for (byte_pos, c) in input.char_indices() {
         match c {
-            '(' => depth += 1,
-            ')' => depth -= 1,
-            ',' if depth == 0 => {
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            '(' if !in_double_quote && !in_single_quote => depth += 1,
+            ')' if !in_double_quote && !in_single_quote => depth -= 1,
+            ',' if depth == 0 && !in_double_quote && !in_single_quote => {
                 args.push(parse_expr(&input[current_start..byte_pos])?);
                 current_start = byte_pos + c.len_utf8();
             }

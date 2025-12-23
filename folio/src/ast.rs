@@ -36,6 +36,7 @@ pub struct Cell {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Expr {
     Number(String),
+    StringLiteral(String),
     Variable(Vec<String>),
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),

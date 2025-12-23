@@ -1,0 +1,49 @@
+<!-- DateTime Shortcuts Example -->
+# DateTime Shortcuts
+
+Demonstrates the period start/end shortcuts and navigation functions.
+
+## Reference Date
+
+| name | formula | result |
+|------|---------|--------|
+| reference | date(2025, 6, 15) | |
+| day_name | weekday(reference) | |
+
+## End of Period @datetimeFmt:YYYY-MM-DD HH:mm:ss
+
+| name | formula | result |
+|------|---------|--------|
+| end_of_day | eod(reference) | |
+| end_of_week | eow(reference) | |
+| end_of_month | eom(reference) | |
+| end_of_quarter | eoq(reference) | |
+| end_of_year | eoy(reference) | |
+
+## Start of Period @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| start_of_day | sod(reference) | |
+| start_of_week | sow(reference) | |
+| start_of_month | som(reference) | |
+| start_of_quarter | soq(reference) | |
+| start_of_year | soy(reference) | |
+
+## Navigation @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| tomorrow_date | tomorrow(reference) | |
+| next_week_start | nextWeek(reference) | |
+| next_month_first | nextMonth(reference) | |
+| next_month_workday | nextMonthWd(reference) | |
+
+## February Edge Case @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| jan_31 | date(2025, 1, 31) | |
+| feb_end | eom(jan_31) | |
+| feb_2024 | date(2024, 2, 15) | |
+| feb_2024_end | eom(feb_2024) | |

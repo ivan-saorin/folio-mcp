@@ -1043,6 +1043,8 @@ fn value_to_json(value: &Value) -> JsonValue {
         Value::Bool(b) => JsonValue::Bool(*b),
         Value::Number(n) => JsonValue::String(n.to_string()),
         Value::Text(s) => JsonValue::String(s.clone()),
+        Value::DateTime(dt) => json!({"_type": "datetime", "value": dt.to_string(), "nanos": dt.as_nanos().to_string()}),
+        Value::Duration(d) => json!({"_type": "duration", "value": d.to_string(), "nanos": d.as_nanos().to_string()}),
         Value::List(l) => JsonValue::Array(l.iter().map(value_to_json).collect()),
         Value::Object(o) => JsonValue::Object(o.iter().map(|(k, v)| (k.clone(), value_to_json(v))).collect()),
         Value::Error(e) => json!({"_error": {"code": e.code, "message": e.message}}),

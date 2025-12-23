@@ -416,7 +416,7 @@ impl Number {
     }
 
     /// Convert to f64 (may lose precision)
-    fn to_f64(&self) -> Option<f64> {
+    pub fn to_f64(&self) -> Option<f64> {
         // Get the representation: significand * 10^exponent
         let (significand, exponent) = self.inner.clone().into_repr().into_parts();
         

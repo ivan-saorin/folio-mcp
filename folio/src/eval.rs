@@ -4,7 +4,7 @@
 
 use crate::ast::{Document, Expr, BinOp, UnaryOp};
 use folio_plugin::EvalContext;
-use folio_core::{Value, FolioError};
+use folio_core::{Value, FolioError, Number};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Result of document evaluation
@@ -169,6 +169,7 @@ impl Evaluator {
     fn collect_deps(&self, expr: &Expr, deps: &mut HashSet<String>) {
         match expr {
             Expr::Number(_) => {}
+            Expr::StringLiteral(_) => {}
             Expr::Variable(parts) => {
                 // The root variable is the dependency
                 if !parts.is_empty() {
@@ -252,6 +253,8 @@ impl Evaluator {
         match expr {
             Expr::Number(s) => self.parse_literal(s),
 
+            Expr::StringLiteral(s) => Value::Text(s.clone()),
+
             Expr::Variable(parts) => {
                 let name = parts.join(".");
                 let result = ctx.get_var(&name);
@@ -307,8 +310,121 @@ impl Evaluator {
         if let Value::Error(e) = &right {
             return Value::Error(e.clone().with_note("from right operand"));
         }
-        
-        // Get numbers
+
+        // Handle DateTime/Duration arithmetic
+        match (&left, &right, op) {
+            // DateTime + Duration -> DateTime
+            (Value::DateTime(dt), Value::Duration(dur), BinOp::Add) => {
+                return Value::DateTime(dt.add_duration(dur));
+            }
+            // Duration + DateTime -> DateTime
+            (Value::Duration(dur), Value::DateTime(dt), BinOp::Add) => {
+                return Value::DateTime(dt.add_duration(dur));
+            }
+            // DateTime - Duration -> DateTime
+            (Value::DateTime(dt), Value::Duration(dur), BinOp::Sub) => {
+                return Value::DateTime(dt.sub_duration(dur));
+            }
+            // DateTime - DateTime -> Duration
+            (Value::DateTime(dt1), Value::DateTime(dt2), BinOp::Sub) => {
+                return Value::Duration(dt1.duration_since(dt2));
+            }
+            // Duration + Duration -> Duration
+            (Value::Duration(d1), Value::Duration(d2), BinOp::Add) => {
+                return Value::Duration(d1.add(d2));
+            }
+            // Duration - Duration -> Duration
+            (Value::Duration(d1), Value::Duration(d2), BinOp::Sub) => {
+                return Value::Duration(d1.sub(d2));
+            }
+            // Duration * Number -> Duration
+            (Value::Duration(dur), Value::Number(n), BinOp::Mul) => {
+                if let Some(scalar) = n.to_i64() {
+                    return Value::Duration(dur.mul(scalar));
+                } else {
+                    // Use floating point for non-integer multipliers
+                    let f = n.to_f64().unwrap_or(1.0);
+                    return Value::Duration(dur.mul_f64(f));
+                }
+            }
+            // Number * Duration -> Duration
+            (Value::Number(n), Value::Duration(dur), BinOp::Mul) => {
+                if let Some(scalar) = n.to_i64() {
+                    return Value::Duration(dur.mul(scalar));
+                } else {
+                    let f = n.to_f64().unwrap_or(1.0);
+                    return Value::Duration(dur.mul_f64(f));
+                }
+            }
+            // Duration / Number -> Duration
+            (Value::Duration(dur), Value::Number(n), BinOp::Div) => {
+                if let Some(scalar) = n.to_i64() {
+                    if scalar == 0 {
+                        return Value::Error(FolioError::div_zero());
+                    }
+                    return Value::Duration(dur.div(scalar).unwrap());
+                } else {
+                    let f = n.to_f64().unwrap_or(1.0);
+                    if f == 0.0 {
+                        return Value::Error(FolioError::div_zero());
+                    }
+                    return Value::Duration(dur.mul_f64(1.0 / f));
+                }
+            }
+            // Duration / Duration -> Number (ratio)
+            (Value::Duration(dur1), Value::Duration(dur2), BinOp::Div) => {
+                let nanos2 = dur2.as_nanos();
+                if nanos2 == 0 {
+                    return Value::Error(FolioError::div_zero());
+                }
+                let nanos1 = dur1.as_nanos();
+                // Return the ratio as a Number (truncate to i64)
+                let ratio = (nanos1 / nanos2) as i64;
+                return Value::Number(Number::from_i64(ratio));
+            }
+            // Invalid DateTime/Duration operations
+            (Value::DateTime(_), Value::DateTime(_), BinOp::Add) => {
+                return Value::Error(FolioError::type_error(
+                    "Duration (to add to DateTime)", "DateTime"
+                ).with_note("cannot add two DateTimes; use dt - dt to get Duration"));
+            }
+            (Value::DateTime(_), _, BinOp::Mul) | (_, Value::DateTime(_), BinOp::Mul) => {
+                return Value::Error(FolioError::type_error(
+                    "Number or Duration", "DateTime"
+                ).with_note("DateTime cannot be multiplied"));
+            }
+            (Value::DateTime(_), _, BinOp::Div) => {
+                return Value::Error(FolioError::type_error(
+                    "Duration", "DateTime"
+                ).with_note("DateTime cannot be divided"));
+            }
+            (Value::DateTime(_), _, BinOp::Pow) | (_, Value::DateTime(_), BinOp::Pow) => {
+                return Value::Error(FolioError::type_error(
+                    "Number", "DateTime"
+                ).with_note("DateTime cannot be used with power operator"));
+            }
+            (Value::Duration(_), _, BinOp::Pow) | (_, Value::Duration(_), BinOp::Pow) => {
+                return Value::Error(FolioError::type_error(
+                    "Number", "Duration"
+                ).with_note("Duration cannot be used with power operator"));
+            }
+            // Type mismatch for DateTime/Duration with other types
+            (Value::DateTime(_), other, _) if !matches!(other, Value::Duration(_) | Value::DateTime(_)) => {
+                return Value::Error(FolioError::type_error("DateTime or Duration", other.type_name()));
+            }
+            (other, Value::DateTime(_), _) if !matches!(other, Value::Duration(_) | Value::DateTime(_) | Value::Number(_)) => {
+                return Value::Error(FolioError::type_error("DateTime, Duration, or Number", other.type_name()));
+            }
+            (Value::Duration(_), other, _) if !matches!(other, Value::Duration(_) | Value::DateTime(_) | Value::Number(_)) => {
+                return Value::Error(FolioError::type_error("DateTime, Duration, or Number", other.type_name()));
+            }
+            (other, Value::Duration(_), _) if !matches!(other, Value::Duration(_) | Value::DateTime(_) | Value::Number(_)) => {
+                return Value::Error(FolioError::type_error("DateTime, Duration, or Number", other.type_name()));
+            }
+            _ => {}
+        }
+
+        // Get numbers (standard numeric operations)
         let l = match left.as_number() {
             Some(n) => n,
             None => return Value::Error(FolioError::type_error("Number", left.type_name())),
@@ -317,8 +433,8 @@ impl Evaluator {
             Some(n) => n,
             None => return Value::Error(FolioError::type_error("Number", right.type_name())),
         };
-        
-        // Perform operation
+
+        // Perform numeric operation
         match op {
             BinOp::Add => Value::Number(l.add(r)),
             BinOp::Sub => Value::Number(l.sub(r)),
@@ -349,7 +465,7 @@ impl Evaluator {
                             return Value::Error(FolioError::div_zero()
                                 .with_note("0 raised to negative power"));
                         }
-                        return Value::Number(folio_core::Number::from_i64(0));
+                        return Value::Number(Number::from_i64(0));
                     }
                     match l.ln(precision) {
                         Ok(ln_l) => {
@@ -367,12 +483,22 @@ impl Evaluator {
         if let Value::Error(e) = &value {
             return Value::Error(e.clone());
         }
-        
+
         match op {
             UnaryOp::Neg => {
+                // Handle Duration negation
+                if let Some(d) = value.as_duration() {
+                    return Value::Duration(d.neg());
+                }
+                // Handle DateTime (not allowed)
+                if value.is_datetime() {
+                    return Value::Error(FolioError::type_error("Number or Duration", "DateTime")
+                        .with_note("DateTime cannot be negated"));
+                }
+                // Handle Number
                 match value.as_number() {
                     Some(n) => {
-                        let zero = folio_core::Number::from_i64(0);
+                        let zero = Number::from_i64(0);
                         Value::Number(zero.sub(n))
                     }
                     None => Value::Error(FolioError::type_error("Number", value.type_name())),

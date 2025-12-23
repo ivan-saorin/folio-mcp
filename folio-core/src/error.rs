@@ -3,7 +3,7 @@
 //! Errors never crash the system. They are values that propagate through
 //! computations and provide clear, actionable information.
 
-use crate::NumberError;
+use crate::{NumberError, DateTimeError};
 use serde::{Deserialize, Serialize};
 
 /// Standard error codes (machine-readable)
@@ -20,6 +20,11 @@ pub mod codes {
     pub const OVERFLOW: &str = "OVERFLOW";
     pub const CIRCULAR_REF: &str = "CIRCULAR_REF";
     pub const INTERNAL: &str = "INTERNAL";
+    // DateTime-specific error codes
+    pub const INVALID_DATE: &str = "INVALID_DATE";
+    pub const INVALID_TIME: &str = "INVALID_TIME";
+    pub const DATE_OVERFLOW: &str = "DATE_OVERFLOW";
+    pub const DATE_PARSE_ERROR: &str = "DATE_PARSE_ERROR";
 }
 
 /// Severity level of an error
@@ -189,6 +194,28 @@ impl FolioError {
             .with_suggestion("This is a bug, please report it")
             .with_severity(Severity::Fatal)
     }
+
+    // ========== DateTime Error Constructors ==========
+
+    pub fn invalid_date(details: impl Into<String>) -> Self {
+        Self::new(codes::INVALID_DATE, format!("Invalid date: {}", details.into()))
+            .with_suggestion("Check date components (year, month 1-12, day 1-31)")
+    }
+
+    pub fn invalid_time(details: impl Into<String>) -> Self {
+        Self::new(codes::INVALID_TIME, format!("Invalid time: {}", details.into()))
+            .with_suggestion("Check time components (hour 0-23, minute 0-59, second 0-59)")
+    }
+
+    pub fn date_overflow() -> Self {
+        Self::new(codes::DATE_OVERFLOW, "DateTime overflow")
+            .with_suggestion("Date value is out of supported range")
+    }
+
+    pub fn date_parse_error(details: impl Into<String>) -> Self {
+        Self::new(codes::DATE_PARSE_ERROR, format!("DateTime parse error: {}", details.into()))
+            .with_suggestion("Use ISO 8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)")
+    }
 }
 
 impl std::fmt::Display for FolioError {
@@ -210,6 +237,21 @@ impl From<NumberError> for FolioError {
             NumberError::DivisionByZero => Self::div_zero(),
             NumberError::DomainError(s) => Self::domain_error(s),
             NumberError::Overflow => Self::new(codes::OVERFLOW, "Numeric overflow"),
+        }
+    }
+}
+
+impl From<DateTimeError> for FolioError {
+    fn from(err: DateTimeError) -> Self {
+        match err {
+            DateTimeError::InvalidMonth(m) => Self::invalid_date(format!("month {} out of range 1-12", m)),
+            DateTimeError::InvalidDay(d, m, y) => Self::invalid_date(format!("day {} invalid for {}/{}", d, m, y)),
+            DateTimeError::InvalidHour(h) => Self::invalid_time(format!("hour {} out of range 0-23", h)),
+            DateTimeError::InvalidMinute(m) => Self::invalid_time(format!("minute {} out of range 0-59", m)),
+            DateTimeError::InvalidSecond(s) => Self::invalid_time(format!("second {} out of range 0-59", s)),
+            DateTimeError::InvalidNano(n) => Self::invalid_time(format!("nanosecond {} out of range", n)),
+            DateTimeError::ParseError(s) => Self::date_parse_error(s),
+            DateTimeError::Overflow => Self::date_overflow(),
         }
     }
 }

@@ -1,0 +1,81 @@
+<!-- DateTime Calculations Example -->
+# DateTime Calculations
+
+Demonstrates datetime arithmetic, duration calculations, and comparisons.
+
+## Duration Arithmetic
+
+| name | formula | result |
+|------|---------|--------|
+| one_week | days(7) | |
+| work_hours | hours(8) | |
+| lunch_break | minutes(45) | |
+| two_weeks | one_week + one_week | |
+| half_week | one_week / 2 | |
+| work_day_hours | work_hours * 5 | |
+
+## Date Math @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| start_date | date(2025, 6, 1) | |
+| one_week_later | start_date + days(7) | |
+| two_months_later | addMonths(start_date, 2) | |
+| one_year_later | addYears(start_date, 1) | |
+| six_months_ago | addMonths(start_date, -6) | |
+
+## Time Differences
+
+| name | formula | result |
+|------|---------|--------|
+| project_start | date(2025, 1, 15) | |
+| project_end | date(2025, 6, 30) | |
+| duration_days | diff(project_end, project_start, "days") | |
+| duration_hours | diff(project_end, project_start, "hours") | |
+| actual_duration | project_end - project_start | |
+
+## Date Comparisons
+
+| name | formula | result |
+|------|---------|--------|
+| deadline | date(2025, 7, 15) | |
+| today_ref | date(2025, 6, 20) | |
+| is_before_deadline | isBefore(today_ref, deadline) | |
+| is_after_deadline | isAfter(today_ref, deadline) | |
+| days_until | diff(deadline, today_ref, "days") | |
+
+## Quarter Calculations @datetimeFmt:YYYY-MM-DD
+
+| name | formula | result |
+|------|---------|--------|
+| q2_date | date(2025, 5, 15) | |
+| q2_start | soq(q2_date) | |
+| q2_end | eoq(q2_date) | |
+| q3_start | soq(date(2025, 7, 1)) | |
+| q3_end | eoq(date(2025, 7, 1)) | |
+
+## Extraction
+
+| name | formula | result |
+|------|---------|--------|
+| sample | datetime(2025, 6, 15, 14, 30, 45) | |
+| sample_year | year(sample) | |
+| sample_month | month(sample) | |
+| sample_day | day(sample) | |
+| sample_hour | hour(sample) | |
+| sample_minute | minute(sample) | |
+| sample_weekday | weekday(sample) | |
+| sample_week | week(sample) | |
+| sample_doy | dayOfYear(sample) | |
+
+## Formatting
+
+| name | formula | result |
+|------|---------|--------|
+| now_ref | datetime(2025, 6, 15, 14, 30, 0) | |
+| us_format | formatDate(now_ref, "MM/DD/YYYY") | |
+| eu_format | formatDate(now_ref, "DD/MM/YYYY") | |
+| iso_format | formatDate(now_ref, "YYYY-MM-DD") | |
+| time_12h | formatTime(now_ref, "hh:mm A") | |
+| time_24h | formatTime(now_ref, "HH:mm:ss") | |
+| full_format | formatDateTime(now_ref, "DD/MM/YYYY HH:mm") | |

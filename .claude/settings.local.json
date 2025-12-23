@@ -4,7 +4,10 @@
       "Bash(cargo build:*)",
       "Bash(cargo test:*)",
       "Bash(powershell -Command \"Measure-Command { cargo run --release --bin folio-mcp 2>&1 | Out-Null }\")",
-      "Bash(cargo run:*)"
+      "Bash(cargo run:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\" && head -20 \"\"\"\"{}\"\"\"\"')"
     ]
   }
 }
