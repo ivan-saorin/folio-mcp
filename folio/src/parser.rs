@@ -62,9 +62,12 @@ pub fn parse(input: &str) -> Result<Document, FolioError> {
             continue;
         }
         
-        // Table separator
-        if line.starts_with('|') && line.contains('-') && in_table && table_rows.is_empty() {
-            continue;
+        // Table separator (only matches lines that contain only |, -, :, and whitespace)
+        if line.starts_with('|') && line.ends_with('|') && in_table && table_rows.is_empty() {
+            let is_separator = line.chars().all(|c| c == '|' || c == '-' || c == ':' || c.is_whitespace());
+            if is_separator {
+                continue;
+            }
         }
         
         // Table row
@@ -149,6 +152,11 @@ fn looks_like_expression(text: &str) -> bool {
         return true;
     }
 
+    // Contains comparison operators
+    if text.contains('<') || text.contains('>') || text.contains("==") || text.contains("!=") {
+        return true;
+    }
+
     // Contains subtraction that's not a leading minus
     if let Some(pos) = text.find('-') {
         if pos > 0 {
@@ -227,7 +235,66 @@ pub fn parse_expr(input: &str) -> Result<Expr, FolioError> {
     if input.is_empty() {
         return Err(FolioError::parse_error("Empty expression"));
     }
-    
+
+    parse_comparison(input)
+}
+
+/// Parse comparison operators (lowest precedence)
+fn parse_comparison(input: &str) -> Result<Expr, FolioError> {
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
+    let mut in_double_quote = false;
+    let mut in_single_quote = false;
+
+    let char_indices: Vec<(usize, char)> = input.char_indices().collect();
+
+    // Scan for comparison operators from left to right (left associative)
+    let mut i = 0;
+    while i < char_indices.len() {
+        let (byte_pos, c) = char_indices[i];
+        match c {
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            '(' if !in_double_quote && !in_single_quote => paren_depth += 1,
+            ')' if !in_double_quote && !in_single_quote => paren_depth -= 1,
+            '[' if !in_double_quote && !in_single_quote => bracket_depth += 1,
+            ']' if !in_double_quote && !in_single_quote => bracket_depth -= 1,
+            '<' | '>' | '=' | '!' if paren_depth == 0 && bracket_depth == 0 && !in_double_quote && !in_single_quote => {
+                // Check for two-character operators
+                let next_char = if i + 1 < char_indices.len() { Some(char_indices[i + 1].1) } else { None };
+                let (op, op_len) = match (c, next_char) {
+                    ('<', Some('=')) => (Some(BinOp::Le), 2),
+                    ('>', Some('=')) => (Some(BinOp::Ge), 2),
+                    ('=', Some('=')) => (Some(BinOp::Eq), 2),
+                    ('!', Some('=')) => (Some(BinOp::Ne), 2),
+                    ('<', _) => (Some(BinOp::Lt), 1),
+                    ('>', _) => (Some(BinOp::Gt), 1),
+                    _ => (None, 1),
+                };
+
+                if let Some(op) = op {
+                    let left = input[..byte_pos].trim();
+                    let right_start = if op_len == 2 {
+                        char_indices[i + 1].0 + char_indices[i + 1].1.len_utf8()
+                    } else {
+                        byte_pos + c.len_utf8()
+                    };
+                    let right = input[right_start..].trim();
+
+                    if !left.is_empty() && !right.is_empty() {
+                        return Ok(Expr::BinaryOp(
+                            Box::new(parse_additive(left)?),
+                            op,
+                            Box::new(parse_additive(right)?),
+                        ));
+                    }
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
     parse_additive(input)
 }
 
@@ -369,13 +436,43 @@ fn parse_primary(input: &str) -> Result<Expr, FolioError> {
         return parse_expr(&input[1..input.len()-1]);
     }
 
-    // Function call
+    // Function call - need to find matching closing parenthesis
     if let Some(paren_pos) = input.find('(') {
-        if input.ends_with(')') {
-            let func_name = input[..paren_pos].trim().to_string();
-            let args_str = &input[paren_pos+1..input.len()-1];
+        let func_name = input[..paren_pos].trim().to_string();
+        // Find the matching closing parenthesis
+        let after_open = &input[paren_pos+1..];
+        let mut depth = 1;
+        let mut close_pos = None;
+        let mut in_double_quote = false;
+        let mut in_single_quote = false;
+        for (i, c) in after_open.char_indices() {
+            match c {
+                '"' if !in_single_quote => in_double_quote = !in_double_quote,
+                '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+                '(' if !in_double_quote && !in_single_quote => depth += 1,
+                ')' if !in_double_quote && !in_single_quote => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close_pos = Some(i);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if let Some(close_idx) = close_pos {
+            let args_str = &after_open[..close_idx];
             let args = parse_args(args_str)?;
-            return Ok(Expr::FunctionCall(func_name, args));
+            let func_call = Expr::FunctionCall(func_name, args);
+
+            // Check if there's a property access after the function call
+            let after_close = &after_open[close_idx + 1..];
+            if after_close.starts_with('.') {
+                // Parse as field access: func().prop.subprop
+                let field_names: Vec<String> = after_close[1..].split('.').map(|s| s.trim().to_string()).collect();
+                return Ok(Expr::FieldAccess(Box::new(func_call), field_names));
+            }
+            return Ok(func_call);
         }
     }
 

@@ -193,6 +193,10 @@ impl Evaluator {
                     self.collect_deps(elem, deps);
                 }
             }
+            Expr::FieldAccess(base_expr, _) => {
+                // Collect dependencies from the base expression
+                self.collect_deps(base_expr, deps);
+            }
         }
     }
 
@@ -312,6 +316,39 @@ impl Evaluator {
                 }
 
                 Value::List(evaluated)
+            }
+
+            Expr::FieldAccess(base_expr, fields) => {
+                let base_value = self.eval_expr(base_expr, ctx);
+
+                // If base evaluation resulted in error, propagate it
+                if let Value::Error(e) = base_value {
+                    return Value::Error(e.with_note(&format!("in field access .{}", fields.join("."))));
+                }
+
+                // Navigate through the fields
+                let mut current = base_value;
+                for field in fields {
+                    match &current {
+                        Value::Object(map) => {
+                            if let Some(value) = map.get(field) {
+                                current = value.clone();
+                            } else {
+                                return Value::Error(
+                                    FolioError::new("FIELD_NOT_FOUND", format!("Field '{}' not found in object", field))
+                                        .with_suggestion(&format!("Available fields: {}", map.keys().cloned().collect::<Vec<_>>().join(", ")))
+                                );
+                            }
+                        }
+                        _ => {
+                            return Value::Error(
+                                FolioError::new("NOT_OBJECT", format!("Cannot access field '{}' on non-object value", field))
+                                    .with_note(&format!("Value is: {:?}", current))
+                            );
+                        }
+                    }
+                }
+                current
             }
         }
     }
@@ -466,6 +503,13 @@ impl Evaluator {
                     Err(e) => Value::Error(e.into()),
                 }
             }
+            // Comparison operators
+            BinOp::Lt => Value::Bool(l.cmp(r) == std::cmp::Ordering::Less),
+            BinOp::Gt => Value::Bool(l.cmp(r) == std::cmp::Ordering::Greater),
+            BinOp::Le => Value::Bool(l.cmp(r) != std::cmp::Ordering::Greater),
+            BinOp::Ge => Value::Bool(l.cmp(r) != std::cmp::Ordering::Less),
+            BinOp::Eq => Value::Bool(l.cmp(r) == std::cmp::Ordering::Equal),
+            BinOp::Ne => Value::Bool(l.cmp(r) != std::cmp::Ordering::Equal),
             BinOp::Pow => {
                 // Power with integer exponent
                 if let Some(exp_i64) = r.to_i64() {

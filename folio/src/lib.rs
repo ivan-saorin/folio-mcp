@@ -721,4 +721,116 @@ mod tests {
         assert!(!with_expr.is_error(), "list with expressions should work, got: {:?}", with_expr);
         assert_eq!(with_expr.as_number().unwrap().to_i64(), Some(4));
     }
+
+    #[test]
+    fn test_long_list_literals() {
+        let folio = test_folio();
+        let doc = r#"
+## Long List Test
+| name | formula | result |
+|------|---------|--------|
+| tech_data | [3.2, -1.5, 5.8, -2.3, 4.1, 2.9, -3.8, 6.2, 1.4, -0.9, 4.5, 3.1, -2.1, 5.3, 2.8, -4.2, 3.9, 1.2, -1.8, 4.7, 2.3, -0.5, 3.8, 2.1] | |
+| tech_mean | mean(tech_data) | |
+| tech_count | count(tech_data) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // tech_data should be a list
+        let tech_data = result.values.get("tech_data");
+        assert!(tech_data.is_some(), "tech_data should exist in values: {:?}", result.values.keys().collect::<Vec<_>>());
+        let tech_data = tech_data.unwrap();
+        assert!(!tech_data.is_error(), "long list literal should work, got: {:?}", tech_data);
+
+        if let Some(list) = tech_data.as_list() {
+            assert_eq!(list.len(), 24, "list should have 24 elements");
+        } else {
+            panic!("tech_data should be a List");
+        }
+
+        // tech_count should be 24
+        let tech_count = result.values.get("tech_count");
+        assert!(tech_count.is_some(), "tech_count should exist");
+        let tech_count = tech_count.unwrap();
+        assert!(!tech_count.is_error(), "count should work, got: {:?}", tech_count);
+        assert_eq!(tech_count.as_number().unwrap().to_i64(), Some(24));
+
+        // tech_mean should work
+        let tech_mean = result.values.get("tech_mean");
+        assert!(tech_mean.is_some(), "tech_mean should exist");
+        let tech_mean = tech_mean.unwrap();
+        assert!(!tech_mean.is_error(), "mean should work, got: {:?}", tech_mean);
+    }
+
+    #[test]
+    fn test_comparison_operators() {
+        let folio = test_folio();
+        let doc = r#"
+## Comparison Operators Test
+| name | formula | result |
+|------|---------|--------|
+| x | 5 | |
+| y | 3 | |
+| lt | x < y | |
+| gt | x > y | |
+| le | x <= y | |
+| ge | x >= y | |
+| eq | x == y | |
+| ne | x != y | |
+| lt_same | 5 <= 5 | |
+| ge_same | 5 >= 5 | |
+| eq_same | 5 == 5 | |
+| with_obj | t_test_1([1, 2, 3, 4, 5], 2.5).p < 0.05 | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // x < y should be false (5 < 3 is false)
+        let lt = result.values.get("lt").unwrap();
+        assert!(!lt.is_error(), "< should work, got: {:?}", lt);
+        assert_eq!(lt.as_bool(), Some(false));
+
+        // x > y should be true (5 > 3 is true)
+        let gt = result.values.get("gt").unwrap();
+        assert!(!gt.is_error(), "> should work, got: {:?}", gt);
+        assert_eq!(gt.as_bool(), Some(true));
+
+        // x <= y should be false
+        let le = result.values.get("le").unwrap();
+        assert!(!le.is_error(), "<= should work, got: {:?}", le);
+        assert_eq!(le.as_bool(), Some(false));
+
+        // x >= y should be true
+        let ge = result.values.get("ge").unwrap();
+        assert!(!ge.is_error(), ">= should work, got: {:?}", ge);
+        assert_eq!(ge.as_bool(), Some(true));
+
+        // x == y should be false
+        let eq = result.values.get("eq").unwrap();
+        assert!(!eq.is_error(), "== should work, got: {:?}", eq);
+        assert_eq!(eq.as_bool(), Some(false));
+
+        // x != y should be true
+        let ne = result.values.get("ne").unwrap();
+        assert!(!ne.is_error(), "!= should work, got: {:?}", ne);
+        assert_eq!(ne.as_bool(), Some(true));
+
+        // 5 <= 5 should be true
+        let lt_same = result.values.get("lt_same").unwrap();
+        assert!(!lt_same.is_error(), "<= with equal should work, got: {:?}", lt_same);
+        assert_eq!(lt_same.as_bool(), Some(true));
+
+        // 5 >= 5 should be true
+        let ge_same = result.values.get("ge_same").unwrap();
+        assert!(!ge_same.is_error(), ">= with equal should work, got: {:?}", ge_same);
+        assert_eq!(ge_same.as_bool(), Some(true));
+
+        // 5 == 5 should be true
+        let eq_same = result.values.get("eq_same").unwrap();
+        assert!(!eq_same.is_error(), "== with equal should work, got: {:?}", eq_same);
+        assert_eq!(eq_same.as_bool(), Some(true));
+
+        // Object field comparison should work
+        let with_obj = result.values.get("with_obj").unwrap();
+        assert!(!with_obj.is_error(), "comparison with object field should work, got: {:?}", with_obj);
+        assert!(with_obj.as_bool().is_some(), "should return a boolean");
+    }
 }

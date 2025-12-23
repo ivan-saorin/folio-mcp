@@ -1,0 +1,373 @@
+# Portfolio Risk Analysis
+# ══════════════════════════════════════════════════════════════════════════════
+# A comprehensive statistical analysis of a 3-asset portfolio using:
+# - Descriptive statistics
+# - Correlation analysis  
+# - Linear regression (beta calculation)
+# - Risk metrics (VaR, Sharpe, Sortino)
+# - Hypothesis testing
+# - Distribution analysis
+# ══════════════════════════════════════════════════════════════════════════════
+
+## Monthly Returns (%) - 24 months of data
+
+| Month | TECH | HEALTH | ENERGY | MARKET |
+|-------|------|--------|--------|--------|
+| 1 | 3.2 | 1.5 | -2.1 | 1.8 |
+| 2 | -1.5 | 2.3 | 4.5 | 0.9 |
+| 3 | 5.8 | 0.8 | -1.2 | 2.1 |
+| 4 | -2.3 | 1.9 | 3.8 | 0.5 |
+| 5 | 4.1 | -0.5 | -3.2 | 1.2 |
+| 6 | 2.9 | 2.1 | 1.5 | 1.5 |
+| 7 | -3.8 | 0.4 | 5.2 | -0.8 |
+| 8 | 6.2 | 1.8 | -0.8 | 2.4 |
+| 9 | 1.4 | 2.5 | 2.3 | 1.1 |
+| 10 | -0.9 | -1.2 | -4.1 | -1.5 |
+| 11 | 4.5 | 1.6 | 0.9 | 1.9 |
+| 12 | 3.1 | 2.2 | 3.5 | 2.0 |
+| 13 | -2.1 | 0.9 | -2.8 | -0.3 |
+| 14 | 5.3 | 1.4 | 1.2 | 1.7 |
+| 15 | 2.8 | 2.8 | 4.1 | 2.2 |
+| 16 | -4.2 | -0.3 | -1.5 | -1.8 |
+| 17 | 3.9 | 1.7 | 2.9 | 1.4 |
+| 18 | 1.2 | 2.4 | -0.5 | 0.8 |
+| 19 | -1.8 | 0.6 | 3.2 | 0.2 |
+| 20 | 4.7 | 1.9 | -1.8 | 1.6 |
+| 21 | 2.3 | 2.1 | 2.4 | 1.3 |
+| 22 | -0.5 | -0.8 | -2.9 | -0.9 |
+| 23 | 3.8 | 1.3 | 1.7 | 1.5 |
+| 24 | 2.1 | 2.6 | 0.8 | 1.2 |
+
+## Portfolio Weights
+
+| Asset | Weight |
+|-------|--------|
+| w_tech | 0.50 |
+| w_health | 0.30 |
+| w_energy | 0.20 |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 1: DESCRIPTIVE STATISTICS
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Tech Stock Analysis
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| tech_data | [3.2, -1.5, 5.8, -2.3, 4.1, 2.9, -3.8, 6.2, 1.4, -0.9, 4.5, 3.1, -2.1, 5.3, 2.8, -4.2, 3.9, 1.2, -1.8, 4.7, 2.3, -0.5, 3.8, 2.1] | |
+| tech_mean | mean(tech_data) | |
+| tech_median | median(tech_data) | |
+| tech_std | stddev(tech_data) | |
+| tech_var | variance(tech_data) | |
+| tech_min | min(tech_data) | |
+| tech_max | max(tech_data) | |
+| tech_range | range(tech_data) | |
+| tech_iqr | iqr(tech_data) | |
+| tech_skew | skewness(tech_data) | |
+| tech_kurt | kurtosis(tech_data) | |
+| tech_cv | cv(tech_data) | |
+
+## Health Stock Analysis
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| health_data | [1.5, 2.3, 0.8, 1.9, -0.5, 2.1, 0.4, 1.8, 2.5, -1.2, 1.6, 2.2, 0.9, 1.4, 2.8, -0.3, 1.7, 2.4, 0.6, 1.9, 2.1, -0.8, 1.3, 2.6] | |
+| health_mean | mean(health_data) | |
+| health_std | stddev(health_data) | |
+| health_skew | skewness(health_data) | |
+| health_kurt | kurtosis(health_data) | |
+
+## Energy Stock Analysis
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| energy_data | [-2.1, 4.5, -1.2, 3.8, -3.2, 1.5, 5.2, -0.8, 2.3, -4.1, 0.9, 3.5, -2.8, 1.2, 4.1, -1.5, 2.9, -0.5, 3.2, -1.8, 2.4, -2.9, 1.7, 0.8] | |
+| energy_mean | mean(energy_data) | |
+| energy_std | stddev(energy_data) | |
+| energy_skew | skewness(energy_data) | |
+| energy_kurt | kurtosis(energy_data) | |
+
+## Market Benchmark
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| market_data | [1.8, 0.9, 2.1, 0.5, 1.2, 1.5, -0.8, 2.4, 1.1, -1.5, 1.9, 2.0, -0.3, 1.7, 2.2, -1.8, 1.4, 0.8, 0.2, 1.6, 1.3, -0.9, 1.5, 1.2] | |
+| market_mean | mean(market_data) | |
+| market_std | stddev(market_data) | |
+
+## Comparative Summary
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| highest_return | max([tech_mean, health_mean, energy_mean]) | |
+| lowest_risk | min([tech_std, health_std, energy_std]) | |
+| best_sharpe_asset | (tech_mean / tech_std) | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 2: CORRELATION & COVARIANCE ANALYSIS
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Pairwise Correlations
+
+| Pair | Formula | Result |
+|------|---------|--------|
+| corr_tech_health | correlation(tech_data, health_data) | |
+| corr_tech_energy | correlation(tech_data, energy_data) | |
+| corr_health_energy | correlation(health_data, energy_data) | |
+| corr_tech_market | correlation(tech_data, market_data) | |
+| corr_health_market | correlation(health_data, market_data) | |
+| corr_energy_market | correlation(energy_data, market_data) | |
+
+## Covariance Matrix Elements
+
+| Pair | Formula | Result |
+|------|---------|--------|
+| cov_tech_health | covariance(tech_data, health_data) | |
+| cov_tech_energy | covariance(tech_data, energy_data) | |
+| cov_health_energy | covariance(health_data, energy_data) | |
+
+## Rank Correlations (Spearman)
+
+| Pair | Formula | Result |
+|------|---------|--------|
+| spear_tech_market | spearman(tech_data, market_data) | |
+| spear_health_market | spearman(health_data, market_data) | |
+| spear_energy_market | spearman(energy_data, market_data) | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 3: BETA CALCULATION (CAPM REGRESSION)
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Tech vs Market Regression
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| reg_tech | linear_reg(market_data, tech_data) | |
+| beta_tech | reg_tech.slope | |
+| alpha_tech | reg_tech.intercept | |
+| r2_tech | reg_tech.r_squared | |
+| se_tech | reg_tech.std_error | |
+
+## Health vs Market Regression
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| reg_health | linear_reg(market_data, health_data) | |
+| beta_health | reg_health.slope | |
+| alpha_health | reg_health.intercept | |
+| r2_health | reg_health.r_squared | |
+
+## Energy vs Market Regression
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| reg_energy | linear_reg(market_data, energy_data) | |
+| beta_energy | reg_energy.slope | |
+| alpha_energy | reg_energy.intercept | |
+| r2_energy | reg_energy.r_squared | |
+
+## Portfolio Beta (Weighted Average)
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| portfolio_beta | 0.50 * beta_tech + 0.30 * beta_health + 0.20 * beta_energy | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 4: PORTFOLIO CONSTRUCTION
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Portfolio Returns (Monthly)
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| port_r1 | 0.50 * 3.2 + 0.30 * 1.5 + 0.20 * (-2.1) | |
+| port_r2 | 0.50 * (-1.5) + 0.30 * 2.3 + 0.20 * 4.5 | |
+| port_r3 | 0.50 * 5.8 + 0.30 * 0.8 + 0.20 * (-1.2) | |
+| port_returns | [1.63, 0.84, 3.1, -0.31, 1.98, 2.38, -0.82, 4.3, 1.91, -1.63, 3.11, 2.95, -0.64, 3.51, 2.66, -2.7, 2.91, 1.2, -0.32, 3.07, 2.26, -1.15, 2.63, 1.87] | |
+
+## Portfolio Statistics
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| port_mean | mean(port_returns) | |
+| port_std | stddev(port_returns) | |
+| port_var | variance(port_returns) | |
+| port_median | median(port_returns) | |
+| port_skew | skewness(port_returns) | |
+| port_kurt | kurtosis(port_returns) | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 5: RISK METRICS
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Sharpe Ratio (Assuming 0.3% monthly risk-free rate)
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| rf_monthly | 0.3 | |
+| sharpe_tech | (tech_mean - rf_monthly) / tech_std | |
+| sharpe_health | (health_mean - rf_monthly) / health_std | |
+| sharpe_energy | (energy_mean - rf_monthly) / energy_std | |
+| sharpe_portfolio | (port_mean - rf_monthly) / port_std | |
+
+## Annualized Metrics
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| ann_return_port | port_mean * 12 | |
+| ann_std_port | port_std * sqrt(12) | |
+| ann_sharpe | sharpe_portfolio * sqrt(12) | |
+
+## Value at Risk (VaR) - Parametric Method
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| z_95 | snorm_inv(0.05) | |
+| z_99 | snorm_inv(0.01) | |
+| var_95_monthly | port_mean + z_95 * port_std | |
+| var_99_monthly | port_mean + z_99 * port_std | |
+| var_95_annual | var_95_monthly * sqrt(12) | |
+
+## Conditional VaR (Expected Shortfall) Approximation
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| es_factor_95 | snorm_pdf(z_95) / 0.05 | |
+| cvar_95 | port_mean - port_std * es_factor_95 | |
+
+## Maximum Drawdown Proxy
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| cumulative | cumsum(port_returns) | |
+| max_cum | max(cumulative) | |
+| min_cum | min(cumulative) | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 6: HYPOTHESIS TESTING
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Test 1: Is Tech mean return significantly different from zero?
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| t_tech_zero | t_test_1(tech_data, 0) | |
+| t_tech_stat | t_tech_zero.t | |
+| p_tech_zero | t_tech_zero.p | |
+| sig_tech | t_tech_zero.p < 0.05 | |
+
+## Test 2: Is Portfolio return significantly different from market?
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| t_port_market | t_test_2(port_returns, market_data) | |
+| t_pm_stat | t_port_market.t | |
+| p_port_market | t_port_market.p | |
+| sig_pm | t_port_market.p < 0.05 | |
+
+## Test 3: Do the three assets have different mean returns? (ANOVA)
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| anova_assets | anova(tech_data, health_data, energy_data) | |
+| f_assets | anova_assets.f | |
+| p_assets | anova_assets.p | |
+| sig_anova | anova_assets.p < 0.05 | |
+
+## Test 4: Is Tech more volatile than Health? (F-test)
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| f_vol | f_test(tech_data, health_data) | |
+| f_vol_stat | f_vol.f | |
+| p_vol | f_vol.p | |
+
+## Test 5: Confidence Interval for Portfolio Return
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| ci_port | ci(port_returns, 0.95) | |
+| ci_low | ci_port.low | |
+| ci_high | ci_port.high | |
+| ci_margin | ci_port.margin | |
+| contains_zero | ci_low < 0 | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 7: DISTRIBUTION ANALYSIS
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Probability Calculations
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| prob_tech_loss | norm_cdf(0, tech_mean, tech_std) | |
+| prob_port_loss | norm_cdf(0, port_mean, port_std) | |
+| prob_port_gt_2 | 1 - norm_cdf(2, port_mean, port_std) | |
+| prob_port_gt_5 | 1 - norm_cdf(5, port_mean, port_std) | |
+
+## Quantiles for Portfolio
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| q10_port | percentile(port_returns, 10) | |
+| q25_port | q1(port_returns) | |
+| q50_port | median(port_returns) | |
+| q75_port | q3(port_returns) | |
+| q90_port | percentile(port_returns, 90) | |
+
+## Z-Scores for Extreme Months
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| worst_month | min(port_returns) | |
+| best_month | max(port_returns) | |
+| z_worst | zscore(worst_month, port_returns) | |
+| z_best | zscore(best_month, port_returns) | |
+| worst_prob | norm_cdf(z_worst, 0, 1) | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 8: ROLLING & TREND ANALYSIS
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Moving Averages
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| ma3_port | moving_avg(port_returns, 3) | |
+| ma6_port | moving_avg(port_returns, 6) | |
+| ewma_port | ewma(port_returns, 0.3) | |
+
+## Momentum Analysis
+
+| Metric | Formula | Result |
+|--------|---------|--------|
+| diffs_port | differences(port_returns) | |
+| pos_months | count(port_returns) | |
+| cumulative_ret | cumsum(port_returns) | |
+| final_cum | nth(cumulative_ret, 23) | |
+
+## ═══════════════════════════════════════════════════════════════════════════
+## SECTION 9: EXECUTIVE SUMMARY
+## ═══════════════════════════════════════════════════════════════════════════
+
+## Key Performance Indicators
+
+| KPI | Formula | Result |
+|-----|---------|--------|
+| Annual Return | port_mean * 12 | |
+| Annual Volatility | port_std * sqrt(12) | |
+| Sharpe Ratio | ann_sharpe | |
+| Portfolio Beta | portfolio_beta | |
+| VaR 95% Monthly | var_95_monthly | |
+| Max Correlation | max([corr_tech_health, corr_tech_energy, corr_health_energy]) | |
+| Returns Significant | sig_tech | |
+| Diversification Benefit | tech_std - port_std | |
+
+## Risk Assessment
+
+| Assessment | Formula | Result |
+|------------|---------|--------|
+| high_beta | portfolio_beta > 1 | |
+| negative_var | var_95_monthly < 0 | |
+| normal_skew | abs(port_skew) < 1 | |
+| excess_kurt | abs(port_kurt) > 3 | |

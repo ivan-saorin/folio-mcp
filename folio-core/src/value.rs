@@ -209,7 +209,15 @@ impl std::fmt::Display for Value {
             Value::DateTime(dt) => write!(f, "{}", dt),
             Value::Duration(d) => write!(f, "{}", d),
             Value::Object(_) => write!(f, "[Object]"),
-            Value::List(l) => write!(f, "[List({})]", l.len()),
+            Value::List(items) => {
+                // Smart list display: show values for small lists, count for large
+                if items.len() <= 5 {
+                    let contents: Vec<String> = items.iter().map(|v| v.to_string()).collect();
+                    write!(f, "[{}]", contents.join(", "))
+                } else {
+                    write!(f, "[{}]", items.len())
+                }
+            }
             Value::Null => write!(f, "null"),
             Value::Error(e) => write!(f, "#ERROR: {}", e.code),
         }

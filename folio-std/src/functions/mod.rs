@@ -1,13 +1,15 @@
-//! Standard math and datetime functions
+//! Standard math, datetime, and utility functions
 
 mod math;
 mod trig;
 mod aggregate;
 mod datetime;
+mod utility;
 
 pub use math::{Sqrt, Ln, Exp, Pow, Abs, Round, Floor, Ceil};
 pub use trig::{Sin, Cos, Tan};
 pub use aggregate::Sum;
+pub use utility::{FieldsFn, HeadFn, TailFn, TakeFn, TypeofFn, DescribeFn, LenFn, NthFn};
 
 // DateTime functions
 pub use datetime::{

@@ -43,10 +43,16 @@ pub enum Expr {
     FunctionCall(String, Vec<Expr>),
     /// List literal: [a, b, c]
     List(Vec<Expr>),
+    /// Field access on expression result: expr.field.subfield
+    FieldAccess(Box<Expr>, Vec<String>),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum BinOp { Add, Sub, Mul, Div, Pow }
+pub enum BinOp {
+    Add, Sub, Mul, Div, Pow,
+    // Comparison operators
+    Lt, Gt, Le, Ge, Eq, Ne,
+}
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum UnaryOp { Neg }

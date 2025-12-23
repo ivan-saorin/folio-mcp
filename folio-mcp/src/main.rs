@@ -218,10 +218,12 @@ struct McpError {
     data: Option<JsonValue>,
 }
 
-/// Create Folio with standard library and ISIS extensions
+/// Create Folio with standard library, stats, and ISIS extensions
 fn create_folio_with_isis() -> Folio {
     // Load standard library
     let registry = folio_std::standard_registry();
+    // Add statistics functions
+    let registry = folio_stats::load_stats_library(registry);
     // Add ISIS extensions
     let registry = folio_isis::load_isis_extensions(registry);
     Folio::new(registry)
@@ -494,8 +496,21 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
                         "name": {
                             "type": "string",
                             "description": "Function or constant name. Omit for general help."
+                        },
+                        "compact": {
+                            "type": "boolean",
+                            "description": "Return compact listing (function names only, ~400 tokens vs ~3000)",
+                            "default": false
                         }
                     }
+                }
+            },
+            {
+                "name": "quick",
+                "description": "Compact quick reference (~400 tokens). Lists function names grouped by category with Object return fields.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
                 }
             },
             {
@@ -721,6 +736,7 @@ fn handle_tool_call(folio: &Folio, params: &Option<JsonValue>) -> Result<JsonVal
         "eval_file" => tool_eval_file(folio, args),
         "eval_batch" => tool_eval_batch(folio, args),
         "folio" => tool_folio(folio, args),
+        "quick" => tool_quick(folio),
         "list_functions" => tool_list_functions(folio, args),
         "list_constants" => tool_list_constants(folio, args),
         "decompose" => tool_decompose(folio, args),
@@ -836,10 +852,15 @@ fn tool_eval_batch(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError
 
 fn tool_folio(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
     let name = args.get("name").and_then(|v| v.as_str());
+    let compact = args.get("compact").and_then(|v| v.as_bool()).unwrap_or(false);
 
-    // If no name provided, return comprehensive overview
+    // If no name provided, return overview (compact or full)
     if name.is_none() {
-        let overview = generate_folio_overview(folio);
+        let overview = if compact {
+            generate_compact_overview(folio)
+        } else {
+            generate_folio_overview(folio)
+        };
         return Ok(json!({
             "content": [{ "type": "text", "text": overview }]
         }));
@@ -850,6 +871,13 @@ fn tool_folio(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
     Ok(json!({
         "content": [{ "type": "text", "text": format_help(&help) }],
         "data": value_to_json(&help)
+    }))
+}
+
+fn tool_quick(folio: &Folio) -> Result<JsonValue, McpError> {
+    let quick_ref = generate_quick_reference(folio);
+    Ok(json!({
+        "content": [{ "type": "text", "text": quick_ref }]
     }))
 }
 
@@ -923,6 +951,130 @@ fn generate_folio_overview(folio: &Folio) -> String {
     out.push_str("| `@sigfigs:N` | Display with N significant figures | `@sigfigs:6` |\n");
 
     out
+}
+
+fn generate_compact_overview(folio: &Folio) -> String {
+    let mut out = String::new();
+
+    out.push_str("# Folio Quick Reference\n\n");
+    out.push_str("## Operators: + - * / ^ ()\n\n");
+
+    // Group functions by category
+    let mut by_category: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+
+    if let Value::List(funcs) = folio.list_functions(None) {
+        for func in funcs {
+            if let Value::Object(map) = func {
+                let name = map.get("name").and_then(|v| if let Value::Text(s) = v { Some(s.clone()) } else { None }).unwrap_or_default();
+                let category = map.get("category").and_then(|v| if let Value::Text(s) = v { Some(s.clone()) } else { None }).unwrap_or_else(|| "other".to_string());
+                by_category.entry(category).or_default().push(name);
+            }
+        }
+    }
+
+    // Sort categories and output
+    let mut categories: Vec<_> = by_category.keys().cloned().collect();
+    categories.sort();
+
+    for cat in categories {
+        if let Some(funcs) = by_category.get(&cat) {
+            out.push_str(&format!("## {}\n", cat));
+            out.push_str(&funcs.join(", "));
+            out.push_str("\n\n");
+        }
+    }
+
+    // Constants (just names)
+    out.push_str("## Constants\n");
+    if let Value::List(consts) = folio.list_constants() {
+        let names: Vec<_> = consts.iter().filter_map(|c| {
+            if let Value::Object(map) = c {
+                map.get("name").and_then(|v| if let Value::Text(s) = v { Some(s.clone()) } else { None })
+            } else { None }
+        }).collect();
+        out.push_str(&names.join(", "));
+    }
+    out.push_str("\n\n");
+
+    out.push_str("Use `folio(name=\"function_name\")` for detailed help.\n");
+
+    out
+}
+
+fn generate_quick_reference(_folio: &Folio) -> String {
+    // Hand-crafted compact reference with Object return fields
+    r#"# Folio Quick Reference
+
+## Operators: + - * / ^ ()
+
+## math
+abs, ceil, floor, round, sqrt, pow, exp, ln
+
+## trig
+sin, cos, tan
+
+## aggregate
+sum
+
+## utility
+fields, head, tail, take, typeof, describe, len, nth
+
+## stats/central
+mean, median, mode, gmean, hmean, tmean, wmean
+
+## stats/dispersion
+variance, variance_p, stddev, stddev_p, range, iqr, mad, cv, se
+
+## stats/position
+min, max, percentile, quantile, q1, q3, rank, zscore
+
+## stats/shape
+skewness, kurtosis, count, product
+
+## stats/bivariate
+covariance, covariance_p, correlation, spearman
+
+## stats/regression
+linear_reg→{slope,intercept,r_squared,r,std_error,n}, slope, intercept, r_squared, predict, residuals
+
+## stats/hypothesis
+t_test_1→{t,p,df,ci_low,ci_high,mean_diff}
+t_test_2→{t,p,df,ci_low,ci_high,mean_diff}
+t_test_paired→{t,p,df,ci_low,ci_high,mean_diff}
+chi_test→{chi_sq,p,df}
+f_test→{f,p,df1,df2}
+anova→{f,p,df_between,df_within,ss_between,ss_within}
+
+## stats/confidence
+ci→{low,high,margin,level}, moe
+
+## stats/transform
+normalize, standardize, cumsum, differences, lag, moving_avg, ewma
+
+## stats/distribution
+norm_pdf, norm_cdf, norm_inv, snorm_pdf, snorm_cdf, snorm_inv
+t_pdf, t_cdf, t_inv, chi_pdf, chi_cdf, chi_inv, f_pdf, f_cdf, f_inv
+binom_pmf, binom_cdf, poisson_pmf, poisson_cdf
+
+## datetime
+now, date, time, datetime, parseDate, parseTime
+year, month, day, hour, minute, second, weekday, dayOfYear, week
+formatDate, formatTime, formatDateTime
+days, hours, minutes, seconds, milliseconds, weeks
+addDays, addMonths, addYears, diff
+isBefore, isAfter, isSameDay
+sod, eod, som, eom, sow, eow, soq, eoq, soy, eoy
+tomorrow, nextWeek, nextMonth, nextMonthWd
+isWorkday, nextWorkday, prevWorkday, addWorkdays
+
+## isis
+ISIS, ISIS_INV
+
+## Tips
+- Use `fields(obj)` to discover Object fields
+- Use `head(list, 5)` to peek at list contents
+- Functions accept both `(a, b, c)` and `([a, b, c])` for lists
+"#.to_string()
 }
 
 fn format_help(help: &Value) -> String {

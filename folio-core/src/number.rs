@@ -494,3 +494,16 @@ impl PartialEq for Number {
 }
 
 impl Eq for Number {}
+
+impl PartialOrd for Number {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Number {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        // DBig implements PartialOrd, use it and treat None as Equal
+        self.inner.partial_cmp(&other.inner).unwrap_or(std::cmp::Ordering::Equal)
+    }
+}

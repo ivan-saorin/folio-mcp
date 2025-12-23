@@ -72,8 +72,71 @@ impl PluginRegistry {
     pub fn call_function(&self, name: &str, args: &[Value], ctx: &EvalContext) -> Value {
         match self.get_function(name) {
             Some(f) => f.call(args, ctx),
-            None => Value::Error(FolioError::undefined_func(name)),
+            None => {
+                // Find similar function names for better error message
+                let similar = self.find_similar_functions(name);
+                let mut err = FolioError::undefined_func(name);
+                if !similar.is_empty() {
+                    let suggestions: Vec<&str> = similar.iter().take(5).map(|s| s.as_str()).collect();
+                    err = err.with_suggestion(format!(
+                        "Similar: {}. Use help() for full list.",
+                        suggestions.join(", ")
+                    ));
+                }
+                Value::Error(err)
+            }
         }
+    }
+
+    /// Find function names similar to the given name (for error suggestions)
+    fn find_similar_functions(&self, name: &str) -> Vec<String> {
+        let name_lower = name.to_lowercase();
+        let mut matches: Vec<(String, usize)> = self.functions.keys()
+            .filter_map(|func_name| {
+                let score = Self::similarity_score(&name_lower, func_name);
+                if score > 0 {
+                    Some((func_name.clone(), score))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by similarity score (higher = more similar)
+        matches.sort_by(|a, b| b.1.cmp(&a.1));
+        matches.into_iter().map(|(name, _)| name).collect()
+    }
+
+    /// Calculate similarity score between two strings
+    fn similarity_score(query: &str, candidate: &str) -> usize {
+        let mut score = 0;
+
+        // Exact prefix match is best
+        if candidate.starts_with(query) {
+            score += 100;
+        }
+        // Contains the query
+        else if candidate.contains(query) {
+            score += 50;
+        }
+        // Query contains the candidate
+        else if query.contains(candidate) {
+            score += 30;
+        }
+
+        // Levenshtein-like: count matching characters
+        let query_chars: std::collections::HashSet<char> = query.chars().collect();
+        let candidate_chars: std::collections::HashSet<char> = candidate.chars().collect();
+        let common = query_chars.intersection(&candidate_chars).count();
+        score += common * 2;
+
+        // Penalize length difference
+        let len_diff = (query.len() as i32 - candidate.len() as i32).unsigned_abs() as usize;
+        if len_diff < 5 && score > 0 {
+            score += 5 - len_diff;
+        }
+
+        score
     }
     
     pub fn decompose(&self, value: &Number, ctx: &EvalContext) -> Value {
