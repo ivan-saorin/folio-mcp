@@ -139,6 +139,11 @@ fn looks_like_expression(text: &str) -> bool {
         return false;
     }
 
+    // List literal
+    if text.starts_with('[') && text.ends_with(']') {
+        return true;
+    }
+
     // Contains operators (but not just a negative number)
     if text.contains('+') || text.contains('*') || text.contains('/') || text.contains('^') {
         return true;
@@ -227,8 +232,9 @@ pub fn parse_expr(input: &str) -> Result<Expr, FolioError> {
 }
 
 fn parse_additive(input: &str) -> Result<Expr, FolioError> {
-    // Find + or - not inside parentheses, function calls, or quotes
-    let mut depth = 0;
+    // Find + or - not inside parentheses, brackets, function calls, or quotes
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
     let mut in_double_quote = false;
     let mut in_single_quote = false;
 
@@ -240,9 +246,11 @@ fn parse_additive(input: &str) -> Result<Expr, FolioError> {
         match c {
             '"' if !in_single_quote => in_double_quote = !in_double_quote,
             '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-            ')' if !in_double_quote && !in_single_quote => depth += 1,
-            '(' if !in_double_quote && !in_single_quote => depth -= 1,
-            '+' | '-' if depth == 0 && idx > 0 && !in_double_quote && !in_single_quote => {
+            ')' if !in_double_quote && !in_single_quote => paren_depth += 1,
+            '(' if !in_double_quote && !in_single_quote => paren_depth -= 1,
+            ']' if !in_double_quote && !in_single_quote => bracket_depth += 1,
+            '[' if !in_double_quote && !in_single_quote => bracket_depth -= 1,
+            '+' | '-' if paren_depth == 0 && bracket_depth == 0 && idx > 0 && !in_double_quote && !in_single_quote => {
                 let left = input[..byte_pos].trim();
                 let right = input[byte_pos + c.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -262,7 +270,8 @@ fn parse_additive(input: &str) -> Result<Expr, FolioError> {
 }
 
 fn parse_multiplicative(input: &str) -> Result<Expr, FolioError> {
-    let mut depth = 0;
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
     let mut in_double_quote = false;
     let mut in_single_quote = false;
 
@@ -274,9 +283,11 @@ fn parse_multiplicative(input: &str) -> Result<Expr, FolioError> {
         match c {
             '"' if !in_single_quote => in_double_quote = !in_double_quote,
             '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-            ')' if !in_double_quote && !in_single_quote => depth += 1,
-            '(' if !in_double_quote && !in_single_quote => depth -= 1,
-            '*' | '/' if depth == 0 && !in_double_quote && !in_single_quote => {
+            ')' if !in_double_quote && !in_single_quote => paren_depth += 1,
+            '(' if !in_double_quote && !in_single_quote => paren_depth -= 1,
+            ']' if !in_double_quote && !in_single_quote => bracket_depth += 1,
+            '[' if !in_double_quote && !in_single_quote => bracket_depth -= 1,
+            '*' | '/' if paren_depth == 0 && bracket_depth == 0 && !in_double_quote && !in_single_quote => {
                 let left = input[..byte_pos].trim();
                 let right = input[byte_pos + c.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -296,7 +307,8 @@ fn parse_multiplicative(input: &str) -> Result<Expr, FolioError> {
 }
 
 fn parse_power(input: &str) -> Result<Expr, FolioError> {
-    let mut depth = 0;
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
     let mut in_double_quote = false;
     let mut in_single_quote = false;
 
@@ -308,9 +320,11 @@ fn parse_power(input: &str) -> Result<Expr, FolioError> {
         match c {
             '"' if !in_single_quote => in_double_quote = !in_double_quote,
             '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-            '(' if !in_double_quote && !in_single_quote => depth += 1,
-            ')' if !in_double_quote && !in_single_quote => depth -= 1,
-            '^' if depth == 0 && !in_double_quote && !in_single_quote => {
+            '(' if !in_double_quote && !in_single_quote => paren_depth += 1,
+            ')' if !in_double_quote && !in_single_quote => paren_depth -= 1,
+            '[' if !in_double_quote && !in_single_quote => bracket_depth += 1,
+            ']' if !in_double_quote && !in_single_quote => bracket_depth -= 1,
+            '^' if paren_depth == 0 && bracket_depth == 0 && !in_double_quote && !in_single_quote => {
                 let left = input[..byte_pos].trim();
                 let right = input[byte_pos + c.len_utf8()..].trim();
                 if !left.is_empty() && !right.is_empty() {
@@ -343,6 +357,13 @@ fn parse_primary(input: &str) -> Result<Expr, FolioError> {
         return Ok(Expr::StringLiteral(content.to_string()));
     }
 
+    // List literal: [a, b, c]
+    if input.starts_with('[') && input.ends_with(']') && input.len() >= 2 {
+        let content = &input[1..input.len()-1];
+        let elements = parse_list_elements(content)?;
+        return Ok(Expr::List(elements));
+    }
+
     // Parentheses
     if input.starts_with('(') && input.ends_with(')') {
         return parse_expr(&input[1..input.len()-1]);
@@ -365,18 +386,20 @@ fn parse_primary(input: &str) -> Result<Expr, FolioError> {
         }
     }
 
-    // Variable (possibly dotted)
+    // Variable (possibly dotted for Section.Column resolution)
     let parts: Vec<String> = input.split('.').map(|s| s.trim().to_string()).collect();
     Ok(Expr::Variable(parts))
 }
 
-fn parse_args(input: &str) -> Result<Vec<Expr>, FolioError> {
+/// Parse list literal elements: a, b, c (similar to args but for lists)
+fn parse_list_elements(input: &str) -> Result<Vec<Expr>, FolioError> {
     if input.trim().is_empty() {
         return Ok(Vec::new());
     }
 
-    let mut args = Vec::new();
-    let mut depth = 0;
+    let mut elements = Vec::new();
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
     let mut in_double_quote = false;
     let mut in_single_quote = false;
     let mut current_start = 0;
@@ -386,9 +409,44 @@ fn parse_args(input: &str) -> Result<Vec<Expr>, FolioError> {
         match c {
             '"' if !in_single_quote => in_double_quote = !in_double_quote,
             '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-            '(' if !in_double_quote && !in_single_quote => depth += 1,
-            ')' if !in_double_quote && !in_single_quote => depth -= 1,
-            ',' if depth == 0 && !in_double_quote && !in_single_quote => {
+            '(' if !in_double_quote && !in_single_quote => paren_depth += 1,
+            ')' if !in_double_quote && !in_single_quote => paren_depth -= 1,
+            '[' if !in_double_quote && !in_single_quote => bracket_depth += 1,
+            ']' if !in_double_quote && !in_single_quote => bracket_depth -= 1,
+            ',' if paren_depth == 0 && bracket_depth == 0 && !in_double_quote && !in_single_quote => {
+                elements.push(parse_expr(&input[current_start..byte_pos])?);
+                current_start = byte_pos + c.len_utf8();
+            }
+            _ => {}
+        }
+    }
+
+    elements.push(parse_expr(&input[current_start..])?);
+    Ok(elements)
+}
+
+fn parse_args(input: &str) -> Result<Vec<Expr>, FolioError> {
+    if input.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut args = Vec::new();
+    let mut paren_depth = 0;
+    let mut bracket_depth = 0;
+    let mut in_double_quote = false;
+    let mut in_single_quote = false;
+    let mut current_start = 0;
+
+    // Use char_indices for proper UTF-8 handling
+    for (byte_pos, c) in input.char_indices() {
+        match c {
+            '"' if !in_single_quote => in_double_quote = !in_double_quote,
+            '\'' if !in_double_quote => in_single_quote = !in_single_quote,
+            '(' if !in_double_quote && !in_single_quote => paren_depth += 1,
+            ')' if !in_double_quote && !in_single_quote => paren_depth -= 1,
+            '[' if !in_double_quote && !in_single_quote => bracket_depth += 1,
+            ']' if !in_double_quote && !in_single_quote => bracket_depth -= 1,
+            ',' if paren_depth == 0 && bracket_depth == 0 && !in_double_quote && !in_single_quote => {
                 args.push(parse_expr(&input[current_start..byte_pos])?);
                 current_start = byte_pos + c.len_utf8();
             }

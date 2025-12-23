@@ -9,6 +9,7 @@ license.workspace = true
 folio-core = { path = "../folio-core" }
 folio-plugin = { path = "../folio-plugin" }
 folio-std = { path = "../folio-std" }
+folio-stats = { path = "../folio-stats" }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 serde = { workspace = true }

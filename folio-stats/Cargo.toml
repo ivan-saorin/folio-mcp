@@ -1,0 +1,11 @@
+[package]
+name = "folio-stats"
+description = "Statistical functions for Folio with arbitrary precision"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+folio-core = { path = "../folio-core" }
+folio-plugin = { path = "../folio-plugin" }
+serde = { workspace = true }

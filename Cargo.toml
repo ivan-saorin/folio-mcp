@@ -4,6 +4,7 @@ members = [
     "folio-core",
     "folio-plugin",
     "folio-std",
+    "folio-stats",
     "folio",
     "folio-mcp",
     "folio-isis",

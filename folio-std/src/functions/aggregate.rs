@@ -28,8 +28,18 @@ impl FunctionPlugin for Sum {
         for arg in args {
             match arg {
                 Value::Number(n) => total = total.add(n),
+                Value::List(list) => {
+                    // Handle List arguments - recursively sum all elements
+                    for item in list {
+                        match item {
+                            Value::Number(n) => total = total.add(n),
+                            Value::Error(e) => return Value::Error(e.clone()),
+                            other => return Value::Error(FolioError::arg_type("sum", "values", "Number", other.type_name())),
+                        }
+                    }
+                }
                 Value::Error(e) => return Value::Error(e.clone()),
-                other => return Value::Error(FolioError::arg_type("sum", "values", "Number", other.type_name())),
+                other => return Value::Error(FolioError::arg_type("sum", "values", "Number or List", other.type_name())),
             }
         }
         Value::Number(total)

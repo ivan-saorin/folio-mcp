@@ -188,6 +188,11 @@ impl Evaluator {
                     self.collect_deps(arg, deps);
                 }
             }
+            Expr::List(elements) => {
+                for elem in elements {
+                    self.collect_deps(elem, deps);
+                }
+            }
         }
     }
 
@@ -291,6 +296,22 @@ impl Evaluator {
                 }
 
                 ctx.registry.call_function(name, &evaluated_args, ctx)
+            }
+
+            Expr::List(elements) => {
+                let evaluated: Vec<Value> = elements
+                    .iter()
+                    .map(|e| self.eval_expr(e, ctx))
+                    .collect();
+
+                // Check for errors in list elements
+                for (i, elem) in evaluated.iter().enumerate() {
+                    if let Value::Error(e) = elem {
+                        return Value::Error(e.clone().with_note(&format!("in list element {}", i + 1)));
+                    }
+                }
+
+                Value::List(evaluated)
             }
         }
     }

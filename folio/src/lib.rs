@@ -29,7 +29,9 @@ impl Folio {
     }
     
     pub fn with_standard_library() -> Self {
-        Self::new(folio_std::standard_registry())
+        let registry = folio_std::standard_registry();
+        let registry = folio_stats::load_stats_library(registry);
+        Self::new(registry)
     }
     
     pub fn with_precision(mut self, precision: u32) -> Self {
@@ -677,5 +679,46 @@ mod tests {
         let formatted = result.values.get("formatted").unwrap();
         assert!(!formatted.is_error(), "formatDate with pattern should work, got: {:?}", formatted);
         assert_eq!(formatted.as_text().unwrap(), "01/15/2025");
+    }
+
+    #[test]
+    fn test_list_literals() {
+        let folio = test_folio();
+        let doc = r#"
+## List Literals Test
+| name | formula | result |
+|------|---------|--------|
+| nums | [1, 2, 3, 4, 5] | |
+| avg | mean(nums) | |
+| sum_val | sum(nums) | |
+| nested | mean([10, 20, 30]) | |
+| with_expr | mean([1 + 1, 2 + 2, 3 + 3]) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // nums should be a list
+        let nums = result.values.get("nums").unwrap();
+        assert!(!nums.is_error(), "list literal should work, got: {:?}", nums);
+        assert!(nums.as_list().is_some(), "nums should be a List");
+
+        // mean([1, 2, 3, 4, 5]) = 3
+        let avg = result.values.get("avg").unwrap();
+        assert!(!avg.is_error(), "mean of list should work, got: {:?}", avg);
+        assert_eq!(avg.as_number().unwrap().to_i64(), Some(3));
+
+        // sum([1, 2, 3, 4, 5]) = 15
+        let sum_val = result.values.get("sum_val").unwrap();
+        assert!(!sum_val.is_error(), "sum of list should work, got: {:?}", sum_val);
+        assert_eq!(sum_val.as_number().unwrap().to_i64(), Some(15));
+
+        // mean([10, 20, 30]) = 20
+        let nested = result.values.get("nested").unwrap();
+        assert!(!nested.is_error(), "inline list in function should work, got: {:?}", nested);
+        assert_eq!(nested.as_number().unwrap().to_i64(), Some(20));
+
+        // mean([2, 4, 6]) = 4
+        let with_expr = result.values.get("with_expr").unwrap();
+        assert!(!with_expr.is_error(), "list with expressions should work, got: {:?}", with_expr);
+        assert_eq!(with_expr.as_number().unwrap().to_i64(), Some(4));
     }
 }

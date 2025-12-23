@@ -41,6 +41,8 @@ pub enum Expr {
     BinaryOp(Box<Expr>, BinOp, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall(String, Vec<Expr>),
+    /// List literal: [a, b, c]
+    List(Vec<Expr>),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
