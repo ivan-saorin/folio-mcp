@@ -16,6 +16,7 @@ folio-plugin = { path = "../folio-plugin" }
 folio-std = { path = "../folio-std" }
 folio-isis = { path = "../folio-isis" }
 folio-stats = { path = "../folio-stats" }
+folio-sequence = { path = "../folio-sequence" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

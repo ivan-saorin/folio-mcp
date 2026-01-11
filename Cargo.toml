@@ -5,6 +5,7 @@ members = [
     "folio-plugin",
     "folio-std",
     "folio-stats",
+    "folio-sequence",
     "folio",
     "folio-mcp",
     "folio-isis",

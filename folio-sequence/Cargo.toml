@@ -1,0 +1,11 @@
+[package]
+name = "folio-sequence"
+description = "Sequence generation and series operations for Folio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+folio-core = { path = "../folio-core" }
+folio-plugin = { path = "../folio-plugin" }
+serde = { workspace = true }
