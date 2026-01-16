@@ -17,6 +17,11 @@ folio-std = { path = "../folio-std" }
 folio-isis = { path = "../folio-isis" }
 folio-stats = { path = "../folio-stats" }
 folio-sequence = { path = "../folio-sequence" }
+folio-finance = { path = "../folio-finance" }
+folio-matrix = { path = "../folio-matrix" }
+folio-units = { path = "../folio-units" }
+folio-text = { path = "../folio-text" }
+folio-kitchen = { path = "../folio-kitchen" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

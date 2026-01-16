@@ -208,7 +208,36 @@ impl std::fmt::Display for Value {
             Value::Bool(b) => write!(f, "{}", b),
             Value::DateTime(dt) => write!(f, "{}", dt),
             Value::Duration(d) => write!(f, "{}", d),
-            Value::Object(_) => write!(f, "[Object]"),
+            Value::Object(obj) => {
+                // Smart object display based on type
+                if let Some(Value::Text(t)) = obj.get("type") {
+                    match t.as_str() {
+                        "Matrix" => {
+                            if let Some(Value::List(data)) = obj.get("data") {
+                                let rows: Vec<String> = data.iter().map(|row| {
+                                    if let Value::List(cols) = row {
+                                        let vals: Vec<String> = cols.iter().map(|v| {
+                                            if let Value::Number(n) = v { n.as_decimal(4) } else { v.to_string() }
+                                        }).collect();
+                                        format!("[{}]", vals.join(", "))
+                                    } else { row.to_string() }
+                                }).collect();
+                                if rows.len() == 1 { write!(f, "{}", rows[0]) }
+                                else { write!(f, "[{}]", rows.join("; ")) }
+                            } else { write!(f, "[Matrix]") }
+                        }
+                        "Vector" => {
+                            if let Some(Value::List(data)) = obj.get("data") {
+                                let vals: Vec<String> = data.iter().map(|v| {
+                                    if let Value::Number(n) = v { n.as_decimal(4) } else { v.to_string() }
+                                }).collect();
+                                write!(f, "[{}]", vals.join(", "))
+                            } else { write!(f, "[Vector]") }
+                        }
+                        _ => write!(f, "[{}]", t)
+                    }
+                } else { write!(f, "[Object]") }
+            }
             Value::List(items) => {
                 // Smart list display: show values for small lists, count for large
                 if items.len() <= 5 {

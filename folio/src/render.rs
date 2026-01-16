@@ -141,7 +141,7 @@ impl Renderer {
                 }
             },
             Value::Duration(d) => d.to_string(),
-            Value::Object(_) => "[Object]".to_string(),
+            Value::Object(_) => value.to_string(), // Use Display trait for smart formatting
             Value::List(l) => format!("[{}]", l.len()),
             Value::Null => "null".to_string(),
             Value::Error(e) => format!("#ERROR: {}", e.code),

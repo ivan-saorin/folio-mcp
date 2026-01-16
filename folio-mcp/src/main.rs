@@ -226,8 +226,18 @@ fn create_folio_with_isis() -> Folio {
     let registry = folio_stats::load_stats_library(registry);
     // Add sequence functions
     let registry = folio_sequence::load_sequence_library(registry);
+    // Add finance functions
+    let registry = folio_finance::load_finance_library(registry);
     // Add ISIS extensions
     let registry = folio_isis::load_isis_extensions(registry);
+    // Add matrix/linear algebra functions
+    let registry = folio_matrix::load_matrix_library(registry);
+    // Add physical units and conversions
+    let registry = folio_units::load_units_library(registry);
+    // Add text manipulation functions
+    let registry = folio_text::load_text_library(registry);
+    // Add kitchen/cooking functions
+    let registry = folio_kitchen::load_kitchen_library(registry);
     Folio::new(registry)
 }
 

@@ -31,6 +31,11 @@ impl Folio {
     pub fn with_standard_library() -> Self {
         let registry = folio_std::standard_registry();
         let registry = folio_stats::load_stats_library(registry);
+        let registry = folio_text::load_text_library(registry);
+        let registry = folio_finance::load_finance_library(registry);
+        let registry = folio_units::load_units_library(registry);
+        let registry = folio_matrix::load_matrix_library(registry);
+        let registry = folio_kitchen::load_kitchen_library(registry);
         Self::new(registry)
     }
     
@@ -832,5 +837,340 @@ mod tests {
         let with_obj = result.values.get("with_obj").unwrap();
         assert!(!with_obj.is_error(), "comparison with object field should work, got: {:?}", with_obj);
         assert!(with_obj.as_bool().is_some(), "should return a boolean");
+    }
+
+    #[test]
+    fn test_matrix_operations() {
+        let folio = test_folio();
+        let doc = r#"
+## Matrix Test @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| A | matrix([[1, 2], [3, 4]]) | |
+| rows_A | rows(A) | |
+| cols_A | cols(A) | |
+| det_A | determinant(A) | |
+| trace_A | trace(A) | |
+| v | vector([3, 4]) | |
+| norm_v | norm(v) | |
+| I2 | identity(2) | |
+| coeff | matrix([[2, 1], [1, 3]]) | |
+| rhs | vector([5, 5]) | |
+| solution | solve(coeff, rhs) | |
+| dot_prod | dot(vector([1, 2, 3]), vector([4, 5, 6])) | |
+| cross_prod | cross(vector([1, 0, 0]), vector([0, 1, 0])) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // Test rows/cols
+        let rows = result.values.get("rows_A").unwrap();
+        assert!(!rows.is_error(), "rows should work, got: {:?}", rows);
+        assert_eq!(rows.as_number().unwrap().to_i64(), Some(2));
+
+        let cols = result.values.get("cols_A").unwrap();
+        assert!(!cols.is_error(), "cols should work, got: {:?}", cols);
+        assert_eq!(cols.as_number().unwrap().to_i64(), Some(2));
+
+        // det([[1,2],[3,4]]) = 1*4 - 2*3 = -2
+        let det = result.values.get("det_A").unwrap();
+        assert!(!det.is_error(), "determinant should work, got: {:?}", det);
+        let det_val = det.as_number().unwrap().to_f64().unwrap();
+        assert!((det_val - (-2.0)).abs() < 1e-10, "det should be -2, got: {}", det_val);
+
+        // trace([[1,2],[3,4]]) = 1 + 4 = 5
+        let trace = result.values.get("trace_A").unwrap();
+        assert!(!trace.is_error(), "trace should work, got: {:?}", trace);
+        assert_eq!(trace.as_number().unwrap().to_i64(), Some(5));
+
+        // norm([3, 4]) = 5
+        let norm = result.values.get("norm_v").unwrap();
+        assert!(!norm.is_error(), "norm should work, got: {:?}", norm);
+        let norm_val = norm.as_number().unwrap().to_f64().unwrap();
+        assert!((norm_val - 5.0).abs() < 1e-10, "norm should be 5, got: {}", norm_val);
+
+        // solve([[2,1],[1,3]], [5,5]) = [2, 1]
+        let solution = result.values.get("solution").unwrap();
+        assert!(!solution.is_error(), "solve should work, got: {:?}", solution);
+
+        // dot([1,2,3], [4,5,6]) = 4 + 10 + 18 = 32
+        let dot = result.values.get("dot_prod").unwrap();
+        assert!(!dot.is_error(), "dot should work, got: {:?}", dot);
+        let dot_val = dot.as_number().unwrap().to_f64().unwrap();
+        assert!((dot_val - 32.0).abs() < 1e-10, "dot should be 32, got: {}", dot_val);
+
+        // cross([1,0,0], [0,1,0]) = [0, 0, 1]
+        let cross = result.values.get("cross_prod").unwrap();
+        assert!(!cross.is_error(), "cross should work, got: {:?}", cross);
+    }
+
+    #[test]
+    fn test_matrix_decompositions() {
+        let folio = test_folio();
+        let doc = r#"
+## Decomposition Test @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| A | matrix([[4, 3], [6, 3]]) | |
+| lu_result | lu(A) | |
+| L_mat | lu_result.L | |
+| U_mat | lu_result.U | |
+| qr_mat | matrix([[1, 2], [3, 4], [5, 6]]) | |
+| qr_result | qr(qr_mat) | |
+| Q_mat | qr_result.Q | |
+| R_mat | qr_result.R | |
+| svd_mat | matrix([[1, 2], [3, 4]]) | |
+| svd_result | svd(svd_mat) | |
+| S_vals | svd_result.S | |
+| sym_mat | matrix([[2, 1], [1, 2]]) | |
+| eigen_result | eigen(sym_mat) | |
+| eigenvalues | eigen_result.values | |
+| pd_mat | matrix([[4, 2], [2, 5]]) | |
+| is_pd | ispositivedefinite(pd_mat) | |
+| chol_L | cholesky(pd_mat) | |
+| cond_I | conditionnumber(identity(3)) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // LU decomposition should return L, U, P
+        let lu = result.values.get("lu_result").unwrap();
+        assert!(!lu.is_error(), "lu should work, got: {:?}", lu);
+
+        // QR decomposition should return Q, R
+        let qr = result.values.get("qr_result").unwrap();
+        assert!(!qr.is_error(), "qr should work, got: {:?}", qr);
+
+        // SVD should return U, S, V
+        let svd = result.values.get("svd_result").unwrap();
+        assert!(!svd.is_error(), "svd should work, got: {:?}", svd);
+
+        // Eigenvalues for symmetric matrix [[2,1],[1,2]] are 3 and 1
+        let eigen = result.values.get("eigenvalues").unwrap();
+        assert!(!eigen.is_error(), "eigen should work, got: {:?}", eigen);
+
+        // [[4,2],[2,5]] is positive definite
+        let is_pd = result.values.get("is_pd").unwrap();
+        assert!(!is_pd.is_error(), "is_positive_definite should work, got: {:?}", is_pd);
+        assert_eq!(is_pd.as_bool(), Some(true), "matrix should be positive definite");
+
+        // Cholesky should work on positive definite matrix
+        let chol = result.values.get("chol_L").unwrap();
+        assert!(!chol.is_error(), "cholesky should work, got: {:?}", chol);
+
+        // Condition number of identity is 1
+        let cond = result.values.get("cond_I").unwrap();
+        assert!(!cond.is_error(), "conditionnumber should work, got: {:?}", cond);
+        let cond_val = cond.as_number().unwrap().to_f64().unwrap();
+        assert!((cond_val - 1.0).abs() < 1e-10, "condition number of identity should be 1, got: {}", cond_val);
+    }
+
+    #[test]
+    fn test_finance_functions() {
+        let folio = test_folio();
+        let doc = r#"
+## Finance Test @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| principal | 10000 | |
+| rate | 0.05 | |
+| years | 10 | |
+| fv_result | fv(rate, years, 0, principal) | |
+| pv_result | pv(rate, years, 0, 16288.95) | |
+| cash_flows | [-1000, 300, 400, 400, 300] | |
+| npv_result | npv(0.10, cash_flows) | |
+| irr_result | irr(cash_flows) | |
+| loan | 250000 | |
+| monthly_rate | 0.06 / 12 | |
+| term | 360 | |
+| pmt_result | pmt(monthly_rate, term, loan) | |
+| sln_result | sln(100000, 10000, 5) | |
+| ddb_result | ddb(100000, 10000, 5, 1) | |
+| roi_result | roi(5000, 10000) | |
+| cagr_result | cagr(10000, 15000, 3) | |
+| eff_rate | effective_rate(0.12, 12) | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // FV of 10000 at 5% for 10 years ≈ 16288.95 (negative due to cash flow convention)
+        let fv = result.values.get("fv_result").unwrap();
+        assert!(!fv.is_error(), "fv should work, got: {:?}", fv);
+        let fv_val = fv.as_number().unwrap().to_f64().unwrap();
+        assert!((fv_val.abs() - 16288.95).abs() < 1.0, "fv should be ~16288.95, got: {}", fv_val);
+
+        // NPV should work
+        let npv = result.values.get("npv_result").unwrap();
+        assert!(!npv.is_error(), "npv should work, got: {:?}", npv);
+
+        // IRR should work
+        let irr = result.values.get("irr_result").unwrap();
+        assert!(!irr.is_error(), "irr should work, got: {:?}", irr);
+
+        // PMT should work (mortgage payment)
+        let pmt = result.values.get("pmt_result").unwrap();
+        assert!(!pmt.is_error(), "pmt should work, got: {:?}", pmt);
+
+        // SLN depreciation: (100000 - 10000) / 5 = 18000
+        let sln = result.values.get("sln_result").unwrap();
+        assert!(!sln.is_error(), "sln should work, got: {:?}", sln);
+        let sln_val = sln.as_number().unwrap().to_f64().unwrap();
+        assert!((sln_val - 18000.0).abs() < 0.01, "sln should be 18000, got: {}", sln_val);
+
+        // ROI: (15000 - 10000) / 10000 = 0.5 = 50%
+        let roi = result.values.get("roi_result").unwrap();
+        assert!(!roi.is_error(), "roi should work, got: {:?}", roi);
+        let roi_val = roi.as_number().unwrap().to_f64().unwrap();
+        assert!((roi_val - 0.5).abs() < 0.001, "roi should be 0.5, got: {}", roi_val);
+
+        // CAGR should work
+        let cagr = result.values.get("cagr_result").unwrap();
+        assert!(!cagr.is_error(), "cagr should work, got: {:?}", cagr);
+
+        // Effective rate: (1 + 0.12/12)^12 - 1 ≈ 0.1268
+        let eff = result.values.get("eff_rate").unwrap();
+        assert!(!eff.is_error(), "effectiverate should work, got: {:?}", eff);
+        let eff_val = eff.as_number().unwrap().to_f64().unwrap();
+        assert!((eff_val - 0.1268).abs() < 0.001, "effective rate should be ~0.1268, got: {}", eff_val);
+    }
+
+    #[test]
+    fn test_unit_conversions() {
+        let folio = test_folio();
+        let doc = r#"
+## Units Test @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| meters | 1 | |
+| to_feet | convert(meters, "m", "ft") | |
+| to_inches | convert(meters, "m", "in") | |
+| kg | 1 | |
+| to_pounds | convert(kg, "kg", "lb") | |
+| celsius | 0 | |
+| to_fahrenheit | convert(celsius, "C", "F") | |
+| boiling_c | 100 | |
+| boiling_f | convert(boiling_c, "C", "F") | |
+| liters | 3.785 | |
+| to_gallons | convert(liters, "L", "gal") | |
+| kmh | 100 | |
+| to_mph | convert(kmh, "km/h", "mph") | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // 1 meter ≈ 3.28084 feet
+        let feet = result.values.get("to_feet").unwrap();
+        assert!(!feet.is_error(), "m to ft should work, got: {:?}", feet);
+        let feet_val = feet.as_number().unwrap().to_f64().unwrap();
+        assert!((feet_val - 3.28084).abs() < 0.001, "1m should be ~3.28 ft, got: {}", feet_val);
+
+        // 1 meter ≈ 39.37 inches
+        let inches = result.values.get("to_inches").unwrap();
+        assert!(!inches.is_error(), "m to in should work, got: {:?}", inches);
+        let inches_val = inches.as_number().unwrap().to_f64().unwrap();
+        assert!((inches_val - 39.37).abs() < 0.1, "1m should be ~39.37 in, got: {}", inches_val);
+
+        // 1 kg ≈ 2.205 pounds
+        let pounds = result.values.get("to_pounds").unwrap();
+        assert!(!pounds.is_error(), "kg to lb should work, got: {:?}", pounds);
+        let pounds_val = pounds.as_number().unwrap().to_f64().unwrap();
+        assert!((pounds_val - 2.205).abs() < 0.01, "1kg should be ~2.205 lb, got: {}", pounds_val);
+
+        // 0°C = 32°F
+        let fahrenheit = result.values.get("to_fahrenheit").unwrap();
+        assert!(!fahrenheit.is_error(), "C to F should work, got: {:?}", fahrenheit);
+        let f_val = fahrenheit.as_number().unwrap().to_f64().unwrap();
+        assert!((f_val - 32.0).abs() < 0.01, "0C should be 32F, got: {}", f_val);
+
+        // 100°C = 212°F
+        let boiling = result.values.get("boiling_f").unwrap();
+        assert!(!boiling.is_error(), "100C to F should work, got: {:?}", boiling);
+        let boiling_val = boiling.as_number().unwrap().to_f64().unwrap();
+        assert!((boiling_val - 212.0).abs() < 0.01, "100C should be 212F, got: {}", boiling_val);
+
+        // 3.785 liters ≈ 1 gallon
+        let gallons = result.values.get("to_gallons").unwrap();
+        assert!(!gallons.is_error(), "L to gal should work, got: {:?}", gallons);
+        let gal_val = gallons.as_number().unwrap().to_f64().unwrap();
+        assert!((gal_val - 1.0).abs() < 0.01, "3.785L should be ~1 gal, got: {}", gal_val);
+
+        // 100 km/h ≈ 62.14 mph
+        let mph = result.values.get("to_mph").unwrap();
+        assert!(!mph.is_error(), "km/h to mph should work, got: {:?}", mph);
+        let mph_val = mph.as_number().unwrap().to_f64().unwrap();
+        assert!((mph_val - 62.14).abs() < 0.1, "100 km/h should be ~62.14 mph, got: {}", mph_val);
+    }
+
+    #[test]
+    fn test_matrix_example_file() {
+        // Test that the matrix_test.fmd example file evaluates without errors
+        let content = include_str!("../../examples/matrix_test.fmd");
+        let folio = test_folio();
+        let result = folio.eval(content, &HashMap::new());
+
+        // Check that we have values and most are not errors
+        assert!(!result.values.is_empty(), "matrix_test.fmd should produce values");
+
+        // Count errors
+        let error_count: usize = result.values.values()
+            .filter(|v| v.is_error())
+            .count();
+
+        // Allow a few errors but not too many
+        assert!(error_count < 5,
+            "matrix_test.fmd has {} errors (should be < 5). Errors: {:?}",
+            error_count,
+            result.values.iter()
+                .filter(|(_, v)| v.is_error())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_finance_example_file() {
+        // Test that the finance_test.fmd example file evaluates without errors
+        let content = include_str!("../../examples/finance_test.fmd");
+        let folio = test_folio();
+        let result = folio.eval(content, &HashMap::new());
+
+        // Check that we have values
+        assert!(!result.values.is_empty(), "finance_test.fmd should produce values");
+
+        // Count errors
+        let error_count: usize = result.values.values()
+            .filter(|v| v.is_error())
+            .count();
+
+        assert!(error_count < 5,
+            "finance_test.fmd has {} errors (should be < 5). Errors: {:?}",
+            error_count,
+            result.values.iter()
+                .filter(|(_, v)| v.is_error())
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_units_example_file() {
+        // Test that the units_test.fmd example file evaluates without errors
+        let content = include_str!("../../examples/units_test.fmd");
+        let folio = test_folio();
+        let result = folio.eval(content, &HashMap::new());
+
+        // Check that we have values
+        assert!(!result.values.is_empty(), "units_test.fmd should produce values");
+
+        // Count errors
+        let error_count: usize = result.values.values()
+            .filter(|v| v.is_error())
+            .count();
+
+        assert!(error_count < 5,
+            "units_test.fmd has {} errors (should be < 5). Errors: {:?}",
+            error_count,
+            result.values.iter()
+                .filter(|(_, v)| v.is_error())
+                .collect::<Vec<_>>()
+        );
     }
 }

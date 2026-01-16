@@ -112,6 +112,16 @@ impl Number {
         Self { inner: n / d }
     }
 
+    /// Create from f64 (may lose precision for very large or very small values)
+    pub fn from_f64(f: f64) -> Self {
+        if f.is_nan() || f.is_infinite() {
+            return Self { inner: DBig::ZERO };
+        }
+        // Use string conversion to preserve decimal precision
+        let s = format!("{:.15}", f);
+        Self::from_str(&s).unwrap_or(Self { inner: DBig::ZERO })
+    }
+
     // ========== Predicates ==========
 
     /// Check if zero

@@ -6,7 +6,8 @@ WORKDIR /app
 # Copy workspace
 COPY . .
 
-# Build release
+# Build release (increase stack size to prevent SIGSEGV in rustc)
+ENV RUST_MIN_STACK=16777216
 RUN cargo build --release -p folio-mcp
 
 # Runtime stage

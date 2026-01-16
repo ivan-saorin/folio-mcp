@@ -1,0 +1,136 @@
+# Matrix Operations Test Document
+
+## Basic Matrix Construction @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| A | matrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) | |
+| B | matrix([[1, 0], [0, 1], [1, 1]]) | |
+| I3 | identity(3) | |
+| Z | zeros(2, 3) | |
+| O | ones(2, 2) | |
+| D | diagonal([1, 2, 3]) | |
+
+## Matrix Properties
+
+| name | formula | result |
+|------|---------|--------|
+| rows_A | rows(A) | |
+| cols_A | cols(A) | |
+| shape_A | shape(A) | |
+| is_sq_A | issquare(A) | |
+| is_sq_B | issquare(B) | |
+| trace_A | trace(A) | |
+| det_I3 | determinant(I3) | |
+| rank_A | rank(A) | |
+
+## Matrix Operations
+
+| name | formula | result |
+|------|---------|--------|
+| At | transpose(A) | |
+| A_inv | inverse(matrix([[1, 2], [3, 4]])) | |
+| AB | matmul(A, B) | |
+| elem | get(A, 1, 2) | |
+
+## Vector Operations
+
+| name | formula | result |
+|------|---------|--------|
+| v1 | vector([3, 4]) | |
+| v2 | vector([1, 0]) | |
+| v3 | vector([1, 2, 3]) | |
+| v4 | vector([4, 5, 6]) | |
+| norm_v1 | norm(v1) | |
+| normalized | normalize(v1) | |
+| dot_result | dot(v3, v4) | |
+
+## 3D Vector Operations
+
+| name | formula | result |
+|------|---------|--------|
+| i_vec | vector([1, 0, 0]) | |
+| j_vec | vector([0, 1, 0]) | |
+| k_vec | cross(i_vec, j_vec) | |
+| angle_90 | angle(vector([1, 0]), vector([0, 1])) | |
+| proj | project(vector([3, 4]), vector([1, 0])) | |
+
+## Linear System Solving
+
+| name | formula | result |
+|------|---------|--------|
+| coeff | matrix([[2, 1], [1, 3]]) | |
+| rhs | vector([5, 5]) | |
+| solution | solve(coeff, rhs) | |
+| x_val | get(solution, 0) | |
+| y_val | get(solution, 1) | |
+
+## Matrix Decompositions
+
+| name | formula | result |
+|------|---------|--------|
+| test_mat | matrix([[4, 3], [6, 3]]) | |
+| lu_result | lu(test_mat) | |
+| L_mat | lu_result.L | |
+| U_mat | lu_result.U | |
+| P_mat | lu_result.P | |
+
+## QR Decomposition
+
+| name | formula | result |
+|------|---------|--------|
+| qr_mat | matrix([[1, 2], [3, 4], [5, 6]]) | |
+| qr_result | qr(qr_mat) | |
+| Q_mat | qr_result.Q | |
+| R_mat | qr_result.R | |
+
+## SVD Decomposition
+
+| name | formula | result |
+|------|---------|--------|
+| svd_mat | matrix([[1, 2], [3, 4]]) | |
+| svd_result | svd(svd_mat) | |
+| U_svd | svd_result.U | |
+| S_vals | svd_result.S | |
+| V_svd | svd_result.V | |
+
+## Eigenvalues (Symmetric Matrix)
+
+| name | formula | result |
+|------|---------|--------|
+| sym_mat | matrix([[2, 1], [1, 2]]) | |
+| eigen_result | eigen(sym_mat) | |
+| eigenvalues | eigen_result.values | |
+| eigenvectors | eigen_result.vectors | |
+
+## Condition Number
+
+| name | formula | result |
+|------|---------|--------|
+| cond_I | conditionnumber(I3) | |
+| cond_A | conditionnumber(matrix([[1, 2], [3, 4]])) | |
+
+## Cholesky Decomposition (Positive Definite)
+
+| name | formula | result |
+|------|---------|--------|
+| pd_mat | matrix([[4, 2], [2, 5]]) | |
+| is_pd | ispositivedefinite(pd_mat) | |
+| chol_L | cholesky(pd_mat) | |
+
+## Least Squares
+
+| name | formula | result |
+|------|---------|--------|
+| A_ls | matrix([[1, 1], [1, 2], [1, 3]]) | |
+| b_ls | vector([1, 2, 2]) | |
+| lstsq_result | lstsq(A_ls, b_ls) | |
+
+## Practical Example: 3x3 System
+
+| name | formula | result |
+|------|---------|--------|
+| sys3_A | matrix([[1, 2, 3], [4, 5, 6], [7, 8, 10]]) | |
+| sys3_b | vector([14, 32, 53]) | |
+| sys3_x | solve(sys3_A, sys3_b) | |
+| verify | matmul(sys3_A, matrix([[get(sys3_x, 0)], [get(sys3_x, 1)], [get(sys3_x, 2)]])) | |

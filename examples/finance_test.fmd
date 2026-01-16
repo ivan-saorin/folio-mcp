@@ -1,0 +1,144 @@
+# Financial Functions Test Document
+
+## Time Value of Money @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| principal | 10000 | |
+| rate | 0.05 | |
+| years | 10 | |
+| fv_result | fv(rate, years, 0, principal) | |
+| pv_result | pv(rate, years, 0, 16288.95) | |
+
+## NPV and IRR
+
+| name | formula | result |
+|------|---------|--------|
+| cash_flows | [-1000, 300, 400, 400, 300] | |
+| discount_rate | 0.10 | |
+| npv_result | npv(discount_rate, cash_flows) | |
+| irr_result | irr(cash_flows) | |
+
+## XNPV and XIRR (with dates)
+
+| name | formula | result |
+|------|---------|--------|
+| dates | [date(2024, 1, 1), date(2024, 6, 1), date(2025, 1, 1), date(2025, 6, 1)] | |
+| values | [-10000, 2500, 5000, 5000] | |
+| xnpv_result | xnpv(0.08, values, dates) | |
+| xirr_result | xirr(values, dates) | |
+
+## Loan Calculations
+
+| name | formula | result |
+|------|---------|--------|
+| loan_amount | 250000 | |
+| annual_rate | 0.06 | |
+| monthly_rate | annual_rate / 12 | |
+| term_months | 360 | |
+| monthly_payment | pmt(monthly_rate, term_months, loan_amount) | |
+| first_interest | ipmt(monthly_rate, 1, term_months, loan_amount) | |
+| first_principal | ppmt(monthly_rate, 1, term_months, loan_amount) | |
+
+## Cumulative Interest and Principal
+
+| name | formula | result |
+|------|---------|--------|
+| cumipmt_year1 | cumipmt(monthly_rate, term_months, loan_amount, 1, 12) | |
+| cumprinc_year1 | cumprinc(monthly_rate, term_months, loan_amount, 1, 12) | |
+
+## NPER and RATE
+
+| name | formula | result |
+|------|---------|--------|
+| target_fv | 50000 | |
+| monthly_deposit | 500 | |
+| annual_return | 0.07 | |
+| months_needed | nper(annual_return/12, monthly_deposit, 0, target_fv) | |
+| years_needed | months_needed / 12 | |
+
+## Depreciation Methods
+
+| name | formula | result |
+|------|---------|--------|
+| asset_cost | 100000 | |
+| salvage | 10000 | |
+| useful_life | 5 | |
+| sln_depr | sln(asset_cost, salvage, useful_life) | |
+| ddb_year1 | ddb(asset_cost, salvage, useful_life, 1) | |
+| ddb_year2 | ddb(asset_cost, salvage, useful_life, 2) | |
+| syd_year1 | syd(asset_cost, salvage, useful_life, 1) | |
+| syd_year3 | syd(asset_cost, salvage, useful_life, 3) | |
+
+## Bond Calculations
+
+| name | formula | result |
+|------|---------|--------|
+| face_value | 1000 | |
+| coupon_rate | 0.05 | |
+| yield_rate | 0.04 | |
+| years_to_maturity | 10 | |
+| frequency | 2 | |
+| settlement | date(2024, 1, 1) | |
+| maturity | date(2034, 1, 1) | |
+| bp_result | bond_price(coupon_rate, yield_rate, 100, frequency, settlement, maturity) | |
+| by_result | bond_yield(coupon_rate, 108, 100, frequency, settlement, maturity) | |
+
+## Duration and Convexity
+
+| name | formula | result |
+|------|---------|--------|
+| mac_duration | duration(coupon_rate, yield_rate, frequency, settlement, maturity) | |
+| mod_duration | mduration(coupon_rate, yield_rate, frequency, settlement, maturity) | |
+| bond_convexity | convexity(coupon_rate, yield_rate, frequency, settlement, maturity) | |
+
+## Investment Returns
+
+| name | formula | result |
+|------|---------|--------|
+| initial_investment | 10000 | |
+| final_value | 15000 | |
+| gain | final_value - initial_investment | |
+| holding_period | 3 | |
+| simple_roi | roi(gain, initial_investment) | |
+| cagr_result | cagr(initial_investment, final_value, holding_period) | |
+| hpr_values | [10000, 11000, 10500, 15000] | |
+| hpr_result | holding_period_return(hpr_values) | |
+
+## Risk-Adjusted Returns
+
+| name | formula | result |
+|------|---------|--------|
+| returns | [0.05, -0.02, 0.08, 0.03, -0.01, 0.06, 0.04, -0.03, 0.07, 0.02] | |
+| risk_free | 0.02 | |
+| sharpe_result | sharpe(returns, risk_free) | |
+| sortino_result | sortino(returns, risk_free) | |
+| portfolio_values | [100, 105, 103, 108, 106, 112, 110, 115] | |
+| max_dd | max_drawdown(portfolio_values) | |
+
+## Interest Rate Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| nominal_rate | 0.12 | |
+| periods_per_year | 12 | |
+| effective_annual | effective_rate(nominal_rate, periods_per_year) | |
+| back_to_nominal | nominal_rate(effective_annual, periods_per_year) | |
+| cont_rate | continuous_rate(nominal_rate, periods_per_year) | |
+
+## Real vs Nominal Rates
+
+| name | formula | result |
+|------|---------|--------|
+| nominal_interest | 0.08 | |
+| inflation_rate | 0.03 | |
+| real_rate_result | real_rate(nominal_interest, inflation_rate) | |
+
+## MIRR (Modified IRR)
+
+| name | formula | result |
+|------|---------|--------|
+| project_cf | [-100000, 30000, 40000, 50000, 35000] | |
+| finance_rate | 0.10 | |
+| reinvest_rate | 0.12 | |
+| mirr_result | mirr(project_cf, finance_rate, reinvest_rate) | |

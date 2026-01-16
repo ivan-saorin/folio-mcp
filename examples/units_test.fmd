@@ -1,0 +1,202 @@
+# Unit Conversion Test Document
+
+## Length Conversions @precision:10
+
+| name | formula | result |
+|------|---------|--------|
+| meters | 100 | |
+| to_feet | convert(meters, "m", "ft") | |
+| to_inches | convert(meters, "m", "in") | |
+| to_km | convert(meters, "m", "km") | |
+| to_miles | convert(meters, "m", "mi") | |
+| to_yards | convert(meters, "m", "yd") | |
+
+## Length - Smaller Units
+
+| name | formula | result |
+|------|---------|--------|
+| centimeters | 2.54 | |
+| cm_to_inch | convert(centimeters, "cm", "in") | |
+| millimeters | 25.4 | |
+| mm_to_inch | convert(millimeters, "mm", "in") | |
+
+## Mass/Weight Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| kilograms | 75 | |
+| to_pounds | convert(kilograms, "kg", "lb") | |
+| to_ounces | convert(kilograms, "kg", "oz") | |
+| to_grams | convert(kilograms, "kg", "g") | |
+| to_stones | convert(kilograms, "kg", "st") | |
+
+## Mass - Metric Tons
+
+| name | formula | result |
+|------|---------|--------|
+| metric_tons | 2.5 | |
+| tons_to_kg | convert(metric_tons, "t", "kg") | |
+| tons_to_lb | convert(metric_tons, "t", "lb") | |
+
+## Temperature Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| celsius | 25 | |
+| to_fahrenheit | convert(celsius, "C", "F") | |
+| to_kelvin | convert(celsius, "C", "K") | |
+| freezing_f | convert(0, "C", "F") | |
+| boiling_f | convert(100, "C", "F") | |
+| body_temp_c | convert(98.6, "F", "C") | |
+
+## Volume Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| liters | 3.785 | |
+| to_gallons | convert(liters, "L", "gal") | |
+| to_quarts | convert(liters, "L", "qt") | |
+| to_pints | convert(liters, "L", "pt") | |
+| to_cups | convert(liters, "L", "cup") | |
+| to_ml | convert(liters, "L", "mL") | |
+
+## Volume - Cubic Units
+
+| name | formula | result |
+|------|---------|--------|
+| cubic_meters | 1 | |
+| to_cubic_feet | convert(cubic_meters, "m3", "ft3") | |
+| to_liters | convert(cubic_meters, "m3", "L") | |
+
+## Area Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| square_meters | 100 | |
+| to_sq_feet | convert(square_meters, "m2", "ft2") | |
+| to_sq_yards | convert(square_meters, "m2", "yd2") | |
+| to_acres | convert(square_meters, "m2", "acre") | |
+| to_hectares | convert(square_meters, "m2", "ha") | |
+
+## Speed Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| meters_per_sec | 10 | |
+| to_kmh | convert(meters_per_sec, "m/s", "km/h") | |
+| to_mph | convert(meters_per_sec, "m/s", "mph") | |
+| to_knots | convert(meters_per_sec, "m/s", "kn") | |
+
+## Speed of Sound and Light
+
+| name | formula | result |
+|------|---------|--------|
+| speed_of_sound | 343 | |
+| sound_mph | convert(speed_of_sound, "m/s", "mph") | |
+| speed_of_light_mps | 299792458 | |
+| light_mph | convert(speed_of_light_mps, "m/s", "mph") | |
+
+## Time Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| hours | 24 | |
+| to_minutes | convert(hours, "h", "min") | |
+| to_seconds | convert(hours, "h", "s") | |
+| to_days | convert(hours, "h", "d") | |
+
+## Time - Longer Periods
+
+| name | formula | result |
+|------|---------|--------|
+| days | 365 | |
+| to_weeks | convert(days, "d", "wk") | |
+| to_years | convert(days, "d", "yr") | |
+
+## Pressure Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| pascals | 101325 | |
+| to_atm | convert(pascals, "Pa", "atm") | |
+| to_bar | convert(pascals, "Pa", "bar") | |
+| to_psi | convert(pascals, "Pa", "psi") | |
+| to_mmhg | convert(pascals, "Pa", "mmHg") | |
+
+## Energy Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| joules | 1000 | |
+| to_calories | convert(joules, "J", "cal") | |
+| to_kcal | convert(joules, "J", "kcal") | |
+| to_kwh | convert(joules, "J", "kWh") | |
+| to_btu | convert(joules, "J", "BTU") | |
+
+## Power Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| watts | 746 | |
+| to_hp | convert(watts, "W", "hp") | |
+| to_kw | convert(watts, "W", "kW") | |
+| to_btuh | convert(watts, "W", "BTU/h") | |
+
+## Force Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| newtons | 9.8 | |
+| to_lbf | convert(newtons, "N", "lbf") | |
+| to_kgf | convert(newtons, "N", "kgf") | |
+| to_dyn | convert(newtons, "N", "dyn") | |
+
+## Data Storage Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| gigabytes | 1 | |
+| to_mb | convert(gigabytes, "GB", "MB") | |
+| to_kb | convert(gigabytes, "GB", "KB") | |
+| to_bytes | convert(gigabytes, "GB", "B") | |
+| to_tb | convert(gigabytes, "GB", "TB") | |
+
+## Angle Conversions
+
+| name | formula | result |
+|------|---------|--------|
+| degrees | 180 | |
+| to_radians | convert(degrees, "deg", "rad") | |
+| to_gradians | convert(degrees, "deg", "grad") | |
+| full_circle_rad | convert(360, "deg", "rad") | |
+
+## Practical Examples
+
+### Cooking Conversion
+| name | formula | result |
+|------|---------|--------|
+| recipe_cups | 2.5 | |
+| recipe_ml | convert(recipe_cups, "cup", "mL") | |
+| recipe_tbsp | convert(recipe_cups, "cup", "tbsp") | |
+
+### Travel Distance
+| name | formula | result |
+|------|---------|--------|
+| marathon_km | 42.195 | |
+| marathon_miles | convert(marathon_km, "km", "mi") | |
+| marathon_yards | convert(marathon_km, "km", "yd") | |
+
+### Body Measurements
+| name | formula | result |
+|------|---------|--------|
+| height_cm | 175 | |
+| height_ft | convert(height_cm, "cm", "ft") | |
+| height_in | convert(height_cm, "cm", "in") | |
+| weight_kg | 70 | |
+| weight_lb | convert(weight_kg, "kg", "lb") | |
+
+### Fuel Efficiency (approximate via conversion)
+| name | formula | result |
+|------|---------|--------|
+| liters_per_100km | 8 | |
+| gallons_per_100mi | convert(liters_per_100km, "L", "gal") * 100 / convert(100, "km", "mi") | |

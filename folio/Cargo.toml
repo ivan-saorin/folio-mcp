@@ -10,6 +10,11 @@ folio-core = { path = "../folio-core" }
 folio-plugin = { path = "../folio-plugin" }
 folio-std = { path = "../folio-std" }
 folio-stats = { path = "../folio-stats" }
+folio-text = { path = "../folio-text" }
+folio-finance = { path = "../folio-finance" }
+folio-units = { path = "../folio-units" }
+folio-matrix = { path = "../folio-matrix" }
+folio-kitchen = { path = "../folio-kitchen" }
 pest = { workspace = true }
 pest_derive = { workspace = true }
 serde = { workspace = true }
