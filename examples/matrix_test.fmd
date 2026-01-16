@@ -1,0 +1,6 @@
+# Matrix Test
+
+| name | formula | result |
+|------|---------|--------|
+| m1 | matrix([[1, 2], [3, 4]]) | |
+| det | determinant(m1) | |

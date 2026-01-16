@@ -1173,4 +1173,60 @@ mod tests {
                 .collect::<Vec<_>>()
         );
     }
+
+    #[test]
+    fn test_quoted_string_literals() {
+        // Test that quoted string literals are properly handled when stored as cell values
+        let folio = test_folio();
+        let doc = r#"
+## Text Functions Test
+
+| name | formula | result |
+|------|---------|--------|
+| base | "Hello World" | |
+| len_base | len(base) | |
+| left5 | left(base, 5) | |
+| sub5 | substring(base, 0, 5) | |
+| with_spaces | "  hello  " | |
+| trimmed | trim(with_spaces) | |
+| starts_hello | starts_with(base, "Hello") | |
+| ends_world | ends_with(base, "World") | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // base should be "Hello World" without the enclosing quotes
+        let base = result.values.get("base").unwrap();
+        assert!(!base.is_error(), "base should work, got: {:?}", base);
+        assert_eq!(base.as_text(), Some("Hello World"), "base should be 'Hello World' without quotes");
+
+        // len(base) should be 11, not 13 (if quotes were included)
+        let len_base = result.values.get("len_base").unwrap();
+        assert!(!len_base.is_error(), "len(base) should work, got: {:?}", len_base);
+        assert_eq!(len_base.as_number().unwrap().to_i64(), Some(11), "len should be 11");
+
+        // left(base, 5) should be "Hello", not "\"Hell"
+        let left5 = result.values.get("left5").unwrap();
+        assert!(!left5.is_error(), "left(base, 5) should work, got: {:?}", left5);
+        assert_eq!(left5.as_text(), Some("Hello"), "left 5 should be 'Hello'");
+
+        // substring(base, 0, 5) should be "Hello"
+        let sub5 = result.values.get("sub5").unwrap();
+        assert!(!sub5.is_error(), "substring(base, 0, 5) should work, got: {:?}", sub5);
+        assert_eq!(sub5.as_text(), Some("Hello"), "substring 0-5 should be 'Hello'");
+
+        // trim should work on the actual string content, not including outer quotes
+        let trimmed = result.values.get("trimmed").unwrap();
+        assert!(!trimmed.is_error(), "trim should work, got: {:?}", trimmed);
+        assert_eq!(trimmed.as_text(), Some("hello"), "trim should return 'hello'");
+
+        // starts_with should work
+        let starts_hello = result.values.get("starts_hello").unwrap();
+        assert!(!starts_hello.is_error(), "starts_with should work, got: {:?}", starts_hello);
+        assert_eq!(starts_hello.as_bool(), Some(true), "should start with 'Hello'");
+
+        // ends_with should work
+        let ends_world = result.values.get("ends_world").unwrap();
+        assert!(!ends_world.is_error(), "ends_with should work, got: {:?}", ends_world);
+        assert_eq!(ends_world.as_bool(), Some(true), "should end with 'World'");
+    }
 }

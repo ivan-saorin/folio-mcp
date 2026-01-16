@@ -1,0 +1,6 @@
+# Finance Test
+
+| name | formula | result |
+|------|---------|--------|
+| pv_result | pv(0.05, 10, 100) | |
+| fv_result | fv(0.05, 10, 100) | |

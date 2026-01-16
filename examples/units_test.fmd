@@ -1,0 +1,6 @@
+# Units Test
+
+| name | formula | result |
+|------|---------|--------|
+| dist | 100 m | |
+| conv | convert(dist, "km") | |

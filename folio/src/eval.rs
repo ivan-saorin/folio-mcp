@@ -354,7 +354,17 @@ impl Evaluator {
     }
     
     fn parse_literal(&self, s: &str) -> Value {
-        match folio_core::Number::from_str(s.trim()) {
+        let s = s.trim();
+
+        // Handle quoted string literals - strip the quotes
+        if (s.starts_with('"') && s.ends_with('"')) ||
+           (s.starts_with('\'') && s.ends_with('\'')) {
+            if s.len() >= 2 {
+                return Value::Text(s[1..s.len()-1].to_string());
+            }
+        }
+
+        match folio_core::Number::from_str(s) {
             Ok(n) => Value::Number(n),
             Err(_) => Value::Text(s.to_string()),
         }
