@@ -2,8 +2,7 @@
 
 **Notebooks for LLMs** — Declarative, reproducible, self-documenting computational documents with 200+ functions.
 
-![Folio Cover](https://)
-
+![Folio Cover](https://raw.githubusercontent.com/ivan-saorin/folio-mcp/refs/heads/master/imgs/folio.png)
 
 ## The Problem
 
@@ -74,47 +73,12 @@ Extend with custom functions via `FunctionPlugin`, `AnalyzerPlugin`, `CommandPlu
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         folio-mcp                               │
-│                    (MCP Server Interface)                       │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────────┐
-│                           folio                                 │
-│              (Parser, Evaluator, Renderer)                      │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌───────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│  folio-std    │   │  folio-stats    │   │  folio-finance  │
-│  math, trig   │   │  statistics     │   │  TVM, bonds     │
-└───────────────┘   └─────────────────┘   └─────────────────┘
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌───────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│ folio-matrix  │   │ folio-sequence  │   │  folio-units    │
-│ linear algebra│   │ fibonacci, etc  │   │ unit conversion │
-└───────────────┘   └─────────────────┘   └─────────────────┘
-        │                     │                    │
-        ▼                     ▼                    ▼
-┌───────────────┐   ┌─────────────────┐   
-│  folio-text   │   │ folio-kitchen   │   
-│ string funcs  │   │ recipe scaling  │   
-└───────────────┘   └─────────────────┘   
-                              │
-┌─────────────────────────────▼───────────────────────────────────┐
-│                       folio-plugin                              │
-│              (Plugin Traits & Registry)                         │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-┌─────────────────────────────▼───────────────────────────────────┐
-│                       folio-core                                │
-│              (Number, Value, Error Types)                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+![Folio Cover](https://raw.githubusercontent.com/ivan-saorin/folio-mcp/refs/heads/master/imgs/Architecture2.png)
+
+![Folio Cover](https://raw.githubusercontent.com/ivan-saorin/folio-mcp/refs/heads/master/imgs/Architecture3.png)
+
+
+
 
 ## Crates
 
