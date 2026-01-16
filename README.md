@@ -158,6 +158,22 @@ MCP Tools exposed:
 - `list_constants()` → List constants with sources
 - `decompose(value)` → Analyze value for mathematical patterns
 
+#### Loading .fmd Files
+
+**Important:** When using `eval_file`, pass the file name **without extension**:
+
+```python
+# ✅ Correct - name only, no extension
+eval_file("mortgage")
+eval_file("datetime_shortcuts")
+
+# ❌ Wrong - don't include .fmd extension
+eval_file("mortgage.fmd")           # Won't work
+eval_file("data/examples/mortgage")  # Won't work - no paths
+```
+
+Files are loaded from the `FOLIO_DATA_PATH` directory (default: `/app/folio` in Docker).
+
 ### As Library
 
 ```rust
