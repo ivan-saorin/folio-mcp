@@ -270,6 +270,10 @@ fn main() {
 
     eprintln!("Server ready, waiting for requests...");
 
+    // Negotiated at `initialize`; threaded into per-request handling so tools/list
+    // can decide whether to attach MCP Apps UI linkage (consumed in a later task).
+    let mut client_ui_support = false;
+
     loop {
         let mut line = String::new();
         match reader.read_line(&mut line) {
@@ -311,7 +315,7 @@ fn main() {
                 eprintln!("Processing: {}", request.method);
 
                 // Handle request
-                let response = handle_request(&folio, &request);
+                let response = handle_request(&folio, &request, &mut client_ui_support);
 
                 // Notifications (no id) should NOT receive a response
                 if request.id.is_none() {
@@ -344,15 +348,18 @@ fn main() {
     eprintln!("Server shutting down");
 }
 
-fn handle_request(folio: &Folio, request: &McpRequest) -> McpResponse {
+fn handle_request(folio: &Folio, request: &McpRequest, client_ui_support: &mut bool) -> McpResponse {
     let result = match request.method.as_str() {
         // Lifecycle
-        "initialize" => handle_initialize(&request.params),
+        "initialize" => {
+            *client_ui_support = detect_ui_support(&request.params);
+            handle_initialize(&request.params)
+        }
         "initialized" => Ok(json!({})),
         "ping" => Ok(json!({})),
 
         // Tools
-        "tools/list" => handle_tools_list(false),
+        "tools/list" => handle_tools_list(*client_ui_support),
         "tools/call" => handle_tool_call(folio, &request.params),
 
         // Resources
@@ -384,6 +391,15 @@ fn handle_request(folio: &Folio, request: &McpRequest) -> McpResponse {
             error: Some(e),
         },
     }
+}
+
+/// True if the client declared support for the MCP Apps UI extension.
+fn detect_ui_support(params: &Option<JsonValue>) -> bool {
+    params.as_ref()
+        .and_then(|p| p.get("capabilities"))
+        .and_then(|c| c.get("extensions"))
+        .and_then(|e| e.get("io.modelcontextprotocol/ui"))
+        .is_some()
 }
 
 fn handle_initialize(params: &Option<JsonValue>) -> Result<JsonValue, McpError> {
@@ -418,6 +434,9 @@ fn handle_initialize(params: &Option<JsonValue>) -> Result<JsonValue, McpError> 
             },
             "prompts": {
                 "listChanged": false
+            },
+            "extensions": {
+                "io.modelcontextprotocol/ui": { "mimeTypes": ["text/html;profile=mcp-app"] }
             }
         },
         "instructions": "Folio evaluates Markdown Computational Documents with arbitrary-precision arithmetic. Use `folio()` to explore functions and `eval`/`eval_file` to compute. The eval tools return a complete, auditable results table that is designed to be shown to the user in full; present that table before adding commentary."
@@ -1319,6 +1338,26 @@ mod tests {
 
     const SIMPLE_DOC: &str =
         "## T\n| name | formula | result |\n|------|---------|--------|\n| a | 1 | |\n";
+
+    #[test]
+    fn test_initialize_advertises_ui_extension() {
+        let res = handle_initialize(&None).unwrap();
+        assert_eq!(
+            res["capabilities"]["extensions"]["io.modelcontextprotocol/ui"]["mimeTypes"][0],
+            "text/html;profile=mcp-app"
+        );
+    }
+
+    #[test]
+    fn test_detect_ui_support() {
+        let yes = Some(json!({
+            "capabilities": { "extensions": { "io.modelcontextprotocol/ui": { "mimeTypes": ["text/html;profile=mcp-app"] } } }
+        }));
+        assert!(detect_ui_support(&yes));
+        assert!(!detect_ui_support(&None));
+        let no = Some(json!({ "capabilities": {} }));
+        assert!(!detect_ui_support(&no));
+    }
 
     #[test]
     fn test_no_sacred_mantra_anywhere() {
