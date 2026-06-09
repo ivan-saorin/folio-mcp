@@ -158,6 +158,12 @@ MCP Tools exposed:
 - `list_constants()` → List constants with sources
 - `decompose(value)` → Analyze value for mathematical patterns
 
+#### MCP Apps (verbatim table rendering)
+
+In hosts that support the MCP Apps extension (`io.modelcontextprotocol/ui`) — such as Claude Desktop and Claude.ai — `eval`/`eval_file` render their results table directly in the conversation via the `ui://folio/table` widget, and `eval_batch` renders its parameter-sweep comparison via `ui://folio/batch`. The widgets read the tool result's `structuredContent` and display the exact computed table, independent of model discretion.
+
+In hosts without MCP Apps support (e.g. Claude Code), the same table is returned as markdown in the tool result's text content, so no output is ever lost — only the rendering differs. Folio advertises the extension during `initialize` and only attaches the widget linkage for clients that declare support.
+
 #### Loading .fmd Files
 
 **Important:** When using `eval_file`, pass the file name **without extension**:

@@ -1,12 +1,17 @@
 //! Folio MCP Server
 //!
-//! MCP Server implementing spec 2025-11-25
+//! MCP Server implementing spec 2025-11-25, with the MCP Apps (SEP-1865)
+//! `io.modelcontextprotocol/ui` extension for verbatim, in-conversation
+//! rendering of computation tables. Tool results carry `structuredContent`
+//! (+ `outputSchema`); UI-capable hosts render the table widget, others fall
+//! back to the markdown in the text content.
 //!
 //! Tools:
-//! - eval: Evaluate a document template
-//! - eval_file: Evaluate a .fmd file by reference
-//! - eval_batch: Batch evaluation for parameter sweeps
-//! - help: Get documentation for functions/constants
+//! - eval: Evaluate a document template (MCP App: ui://folio/table)
+//! - eval_file: Evaluate a .fmd file by reference (MCP App: ui://folio/table)
+//! - eval_batch: Batch evaluation for parameter sweeps (MCP App: ui://folio/batch)
+//! - folio: Get documentation for functions/constants
+//! - quick: Compact quick reference
 //! - list_functions: List available functions
 //! - list_constants: List available constants
 //! - decompose: Analyze a value for patterns
@@ -14,6 +19,8 @@
 //! Resources:
 //! - folio://documents - List available .fmd files
 //! - folio://documents/{name} - Get specific document
+//! - ui://folio/table - MCP Apps widget for eval/eval_file results
+//! - ui://folio/batch - MCP Apps widget for eval_batch comparison
 
 use folio::Folio;
 use folio_core::Value;
