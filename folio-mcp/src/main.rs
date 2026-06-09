@@ -35,6 +35,9 @@ use serde_json::{json, Value as JsonValue};
 const PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "folio";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// Bump on each diagnostic rebuild so the `version` tool and `serverInfo`
+/// reveal exactly which build a client (e.g. Claude Desktop) is connected to.
+const BUILD_TAG: &str = "2026-06-09-version-tool";
 
 const WIDGET_TABLE_HTML: &str = include_str!("widgets/table.html");
 const WIDGET_BATCH_HTML: &str = include_str!("widgets/batch.html");
@@ -432,7 +435,7 @@ fn handle_initialize(params: &Option<JsonValue>) -> Result<JsonValue, McpError> 
         "protocolVersion": client_protocol,
         "serverInfo": {
             "name": SERVER_NAME,
-            "version": SERVER_VERSION,
+            "version": format!("{}+{}", SERVER_VERSION, BUILD_TAG),
             "description": "Markdown Computational Documents - Jupyter for LLMs"
         },
         "capabilities": {
@@ -603,6 +606,16 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
                 "name": "quick",
                 "title": "Folio Quick Reference",
                 "description": "Compact quick reference (~400 tokens). Lists function names grouped by category with Object return fields.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {}
+                }
+            },
+            {
+                "name": "version",
+                "title": "Folio Version",
+                "description": "Returns the running Folio server version, build tag, MCP protocol version, and the full list of tools the server registers. Call this to confirm exactly which build is connected.",
                 "annotations": { "readOnlyHint": true, "openWorldHint": false },
                 "inputSchema": {
                     "type": "object",
@@ -894,6 +907,7 @@ fn handle_tool_call(folio: &Folio, params: &Option<JsonValue>) -> Result<JsonVal
         "eval_batch" => tool_eval_batch(folio, args),
         "folio" => tool_folio(folio, args),
         "quick" => tool_quick(folio),
+        "version" => tool_version(),
         "list_functions" => tool_list_functions(folio, args),
         "list_constants" => tool_list_constants(folio, args),
         "decompose" => tool_decompose(folio, args),
@@ -903,6 +917,32 @@ fn handle_tool_call(folio: &Folio, params: &Option<JsonValue>) -> Result<JsonVal
             data: None,
         }),
     }
+}
+
+/// Diagnostic tool: report the running build (so we can confirm exactly which
+/// server a client like Claude Desktop is connected to) plus the full list of
+/// tools the server registers — useful when a client silently hides some.
+fn tool_version() -> Result<JsonValue, McpError> {
+    let names: Vec<String> = handle_tools_list(false)
+        .ok()
+        .and_then(|v| v["tools"].as_array().map(|arr| {
+            arr.iter().filter_map(|t| t["name"].as_str().map(String::from)).collect()
+        }))
+        .unwrap_or_default();
+    let text = format!(
+        "Folio MCP server\n- version: {}\n- build: {}\n- protocol: {}\n- tools registered by server ({}): {}",
+        SERVER_VERSION, BUILD_TAG, PROTOCOL_VERSION, names.len(), names.join(", ")
+    );
+    Ok(json!({
+        "content": [{ "type": "text", "text": text, "annotations": { "audience": ["user"], "priority": 1.0 } }],
+        "structuredContent": {
+            "version": SERVER_VERSION,
+            "build": BUILD_TAG,
+            "protocol": PROTOCOL_VERSION,
+            "toolCount": names.len(),
+            "registeredTools": names
+        }
+    }))
 }
 
 /// Build a spec-compliant CallToolResult for a single-document evaluation.
@@ -1546,6 +1586,28 @@ mod tests {
         assert!(eval["outputSchema"]["properties"]["cells"].is_object());
         // No UI linkage when the client does not support the extension.
         assert!(eval.get("_meta").is_none());
+    }
+
+    #[test]
+    fn test_version_tool_is_surfaceable_and_reports_registry() {
+        // The diagnostic `version` tool must be in the always-shown category:
+        // no required params, no _meta, title relocated into annotations.title.
+        let res = handle_tools_list(false).unwrap();
+        let tools = res["tools"].as_array().unwrap();
+        let v = tools.iter().find(|t| t["name"] == "version").expect("version tool registered");
+        assert!(v["inputSchema"].get("required").is_none(), "version must have no required params");
+        assert!(v.get("_meta").is_none(), "version must have no _meta");
+        assert!(v["annotations"]["title"].is_string(), "version title in annotations");
+
+        // tool_version reports the build tag and the full server-side registry,
+        // so a client that hides tools can still be shown what the server sent.
+        let out = tool_version().unwrap();
+        assert_eq!(out["structuredContent"]["build"], BUILD_TAG);
+        let names: Vec<&str> = out["structuredContent"]["registeredTools"].as_array().unwrap()
+            .iter().filter_map(|n| n.as_str()).collect();
+        assert!(names.contains(&"eval"), "registry must include eval");
+        assert!(names.contains(&"version"), "registry must include version itself");
+        assert!(names.len() >= 9, "expected >= 9 registered tools, got {}", names.len());
     }
 
     #[test]
