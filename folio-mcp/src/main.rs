@@ -758,6 +758,43 @@ fn handle_tool_call(folio: &Folio, params: &Option<JsonValue>) -> Result<JsonVal
     }
 }
 
+/// Build a spec-compliant CallToolResult for a single-document evaluation.
+fn eval_result_json(result: &folio::EvalResult) -> JsonValue {
+    let errors: Vec<JsonValue> = result.values.iter()
+        .filter_map(|(name, v)| {
+            if let Value::Error(e) = v {
+                Some(json!({ "code": e.code, "message": e.message, "cell": name }))
+            } else {
+                None
+            }
+        })
+        .collect();
+    let is_error = !errors.is_empty();
+
+    let cells: Vec<JsonValue> = result.cells.iter().map(|c| json!({
+        "name": c.name,
+        "formula": c.formula,
+        "result": c.result,
+        "isError": c.is_error,
+        "section": c.section,
+    })).collect();
+
+    json!({
+        "content": [{
+            "type": "text",
+            "text": result.markdown,
+            "annotations": { "audience": ["user"], "priority": 1.0 }
+        }],
+        "structuredContent": {
+            "cells": cells,
+            "markdown": result.markdown,
+            "errors": errors,
+            "isError": is_error
+        },
+        "isError": is_error
+    })
+}
+
 fn tool_eval(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
     let template = args.get("template")
         .and_then(|v| v.as_str())
@@ -774,12 +811,7 @@ fn tool_eval(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
 
     let result = folio.eval(template, &variables);
 
-    Ok(json!({
-        "content": [{ "type": "text", "text": result.markdown }],
-        "values": result.values.iter().map(|(k, v)| (k.clone(), value_to_json(v))).collect::<HashMap<_, _>>(),
-        "errors": result.errors.iter().map(|e| json!({"code": e.code, "message": e.message})).collect::<Vec<_>>(),
-        "isError": !result.errors.is_empty()
-    }))
+    Ok(eval_result_json(&result))
 }
 
 fn tool_eval_file(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
@@ -804,13 +836,9 @@ fn tool_eval_file(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError>
 
     let result = folio.eval(&template, &variables);
 
-    Ok(json!({
-        "content": [{ "type": "text", "text": result.markdown }],
-        "source_file": format!("{}.fmd", name),
-        "values": result.values.iter().map(|(k, v)| (k.clone(), value_to_json(v))).collect::<HashMap<_, _>>(),
-        "errors": result.errors.iter().map(|e| json!({"code": e.code, "message": e.message})).collect::<Vec<_>>(),
-        "isError": !result.errors.is_empty()
-    }))
+    let mut out = eval_result_json(&result);
+    out["structuredContent"]["sourceFile"] = json!(format!("{}.fmd", name));
+    Ok(out)
 }
 
 fn tool_eval_batch(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
@@ -1230,5 +1258,37 @@ mod tests {
         let init = handle_initialize(&None).unwrap();
         let instr = init["instructions"].as_str().unwrap();
         assert!(!instr.to_uppercase().contains("SACRED"), "mantra in initialize instructions");
+    }
+
+    #[test]
+    fn test_eval_structured_content_and_annotations() {
+        let folio = create_folio_with_isis();
+        let doc = "## T\n| name | formula | result |\n|------|---------|--------|\n| a | 10 | |\n| b | a * 2 | |\n";
+        let res = tool_eval(&folio, eval_args(doc)).unwrap();
+
+        // User-facing text block carries the audience annotation.
+        assert_eq!(res["content"][0]["annotations"]["audience"][0], "user");
+        assert_eq!(res["content"][0]["annotations"]["priority"], 1.0);
+
+        // structuredContent.cells is ordered and renderer-matched.
+        let cells = res["structuredContent"]["cells"].as_array().unwrap();
+        assert_eq!(cells[0]["name"], "a");
+        assert_eq!(cells[1]["formula"], "a * 2");
+        assert_eq!(cells[1]["isError"], false);
+
+        // No non-standard top-level fields remain.
+        assert!(res.get("values").is_none(), "non-standard top-level 'values' must be gone");
+        assert_eq!(res["isError"], false);
+    }
+
+    #[test]
+    fn test_eval_iserror_on_div_zero() {
+        let folio = create_folio_with_isis();
+        let doc = "## T\n| name | formula | result |\n|------|---------|--------|\n| x | 42 / 0 | |\n";
+        let res = tool_eval(&folio, eval_args(doc)).unwrap();
+        assert_eq!(res["isError"], true);
+        let errs = res["structuredContent"]["errors"].as_array().unwrap();
+        assert!(!errs.is_empty(), "div-by-zero must populate structured errors");
+        assert_eq!(errs[0]["cell"], "x");
     }
 }
