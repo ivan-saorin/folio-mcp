@@ -911,7 +911,7 @@ fn tool_folio(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
 
     Ok(json!({
         "content": [{ "type": "text", "text": format_help(&help) }],
-        "data": value_to_json(&help)
+        "structuredContent": { "help": value_to_json(&help) }
     }))
 }
 
@@ -1170,7 +1170,7 @@ fn tool_list_functions(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpE
         }
     }
 
-    Ok(json!({ "content": [{ "type": "text", "text": text }], "data": value_to_json(&functions) }))
+    Ok(json!({ "content": [{ "type": "text", "text": text }], "structuredContent": { "functions": value_to_json(&functions) } }))
 }
 
 fn tool_list_constants(folio: &Folio, _args: JsonValue) -> Result<JsonValue, McpError> {
@@ -1195,7 +1195,7 @@ fn tool_list_constants(folio: &Folio, _args: JsonValue) -> Result<JsonValue, Mcp
 
     text.push_str("\n**Note:** Particle masses are in MeV. Use constants directly in formulas, e.g., `m_e * c^2`\n");
 
-    Ok(json!({ "content": [{ "type": "text", "text": text }], "data": value_to_json(&constants) }))
+    Ok(json!({ "content": [{ "type": "text", "text": text }], "structuredContent": { "constants": value_to_json(&constants) } }))
 }
 
 fn tool_decompose(_folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
@@ -1205,9 +1205,7 @@ fn tool_decompose(_folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError
 
     Ok(json!({
         "content": [{ "type": "text", "text": format!("Analysis of {}\n\nPattern detection pending implementation.", value_str) }],
-        "value": value_str,
-        "patterns": {},
-        "_note": "DECOMPOSE implementation pending"
+        "structuredContent": { "value": value_str, "patterns": {}, "note": "DECOMPOSE implementation pending" }
     }))
 }
 
@@ -1314,5 +1312,22 @@ mod tests {
         let cmp = res["structuredContent"]["comparison"].as_array().unwrap();
         assert_eq!(cmp.len(), 2);
         assert!(res.get("results").is_none(), "non-standard top-level 'results' must be gone");
+    }
+
+    #[test]
+    fn test_informational_tools_have_no_adhoc_top_level_fields() {
+        let folio = create_folio_with_isis();
+
+        let lf = tool_list_functions(&folio, json!({})).unwrap();
+        assert!(lf.get("data").is_none(), "list_functions must not use top-level 'data'");
+        assert!(lf["structuredContent"]["functions"].is_array());
+
+        let lc = tool_list_constants(&folio, json!({})).unwrap();
+        assert!(lc.get("data").is_none());
+        assert!(lc["structuredContent"]["constants"].is_array());
+
+        let dc = tool_decompose(&folio, json!({"value": "1.618"})).unwrap();
+        assert!(dc.get("patterns").is_none(), "decompose must not use top-level 'patterns'");
+        assert!(dc.get("_note").is_none());
     }
 }
