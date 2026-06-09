@@ -659,6 +659,23 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
             }
         ]
     });
+    // Compatibility: Claude Desktop drops a tool that carries BOTH a top-level
+    // `title` and an `annotations` object together with required input params
+    // (observed: eval/eval_file/eval_batch/decompose silently disappeared from
+    // the tool surface). No other server combines tool-level `title` with
+    // `annotations`. Relocate the human title into `annotations.title` — the
+    // older, universally-supported location (e.g. Desktop Commander) — and drop
+    // the top-level `title`, eliminating the field co-occurrence.
+    if let Some(arr) = value["tools"].as_array_mut() {
+        for t in arr.iter_mut() {
+            if let Some(title) = t.as_object_mut().and_then(|o| o.remove("title")) {
+                if let Some(ann) = t.get_mut("annotations").and_then(|a| a.as_object_mut()) {
+                    ann.insert("title".to_string(), title);
+                }
+            }
+        }
+    }
+
     if client_ui_support {
         if let Some(arr) = value["tools"].as_array_mut() {
             for t in arr.iter_mut() {
@@ -1517,7 +1534,11 @@ mod tests {
         let res = handle_tools_list(false).unwrap();
         let tools = res["tools"].as_array().unwrap();
         for t in tools {
-            assert!(t["title"].is_string(), "{} missing title", t["name"]);
+            // Claude Desktop drops tools that carry BOTH a top-level `title` and an
+            // `annotations` object alongside required params, so the human title
+            // lives in `annotations.title` (Desktop Commander's proven pattern).
+            assert!(t.get("title").is_none(), "{} must not carry a top-level title", t["name"]);
+            assert!(t["annotations"]["title"].is_string(), "{} missing annotations.title", t["name"]);
             assert_eq!(t["annotations"]["readOnlyHint"], true, "{} readOnlyHint", t["name"]);
             assert_eq!(t["annotations"]["openWorldHint"], false, "{} openWorldHint", t["name"]);
         }
