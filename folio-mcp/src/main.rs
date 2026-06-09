@@ -29,6 +29,9 @@ const PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "folio";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+const WIDGET_TABLE_HTML: &str = include_str!("widgets/table.html");
+const WIDGET_BATCH_HTML: &str = include_str!("widgets/batch.html");
+
 /// Get the data path from environment
 fn data_path() -> PathBuf {
     env::var("FOLIO_DATA_PATH")
@@ -656,14 +659,22 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
 fn handle_resources_list() -> Result<JsonValue, McpError> {
     let files = list_fmd_files();
 
-    let resources: Vec<JsonValue> = files.iter().map(|f| {
+    let mut resources = vec![
+        json!({ "uri": "ui://folio/table", "name": "Folio Results Table",
+            "description": "Renders a Folio computation table verbatim.",
+            "mimeType": "text/html;profile=mcp-app" }),
+        json!({ "uri": "ui://folio/batch", "name": "Folio Comparison Table",
+            "description": "Renders a Folio parameter-sweep comparison.",
+            "mimeType": "text/html;profile=mcp-app" }),
+    ];
+    resources.extend(files.iter().map(|f| {
         json!({
             "uri": format!("folio://documents/{}", f.name),
             "name": f.name,
             "description": f.description.clone().unwrap_or_else(|| format!("Folio document: {}.fmd", f.name)),
             "mimeType": "text/markdown"
         })
-    }).collect();
+    }));
 
     Ok(json!({ "resources": resources }))
 }
@@ -677,6 +688,19 @@ fn handle_resources_read(params: &Option<JsonValue>) -> Result<JsonValue, McpErr
             message: "Missing uri parameter".to_string(),
             data: None,
         })?;
+
+    if let Some(html) = match uri {
+        "ui://folio/table" => Some(WIDGET_TABLE_HTML),
+        "ui://folio/batch" => Some(WIDGET_BATCH_HTML),
+        _ => None,
+    } {
+        return Ok(json!({ "contents": [{
+            "uri": uri,
+            "mimeType": "text/html;profile=mcp-app",
+            "text": html,
+            "_meta": { "ui": { "prefersBorder": true } }
+        }]}));
+    }
 
     let name = uri.strip_prefix("folio://documents/")
         .ok_or_else(|| McpError {
@@ -1450,5 +1474,22 @@ mod tests {
         assert!(eval["outputSchema"]["properties"]["cells"].is_object());
         // No UI linkage when the client does not support the extension.
         assert!(eval.get("_meta").is_none());
+    }
+
+    #[test]
+    fn test_ui_resources_listed_and_readable() {
+        let list = handle_resources_list().unwrap();
+        let uris: Vec<&str> = list["resources"].as_array().unwrap().iter()
+            .map(|r| r["uri"].as_str().unwrap()).collect();
+        assert!(uris.contains(&"ui://folio/table"));
+        assert!(uris.contains(&"ui://folio/batch"));
+
+        for uri in ["ui://folio/table", "ui://folio/batch"] {
+            let res = handle_resources_read(&Some(json!({ "uri": uri }))).unwrap();
+            assert_eq!(res["contents"][0]["mimeType"], "text/html;profile=mcp-app");
+            let html = res["contents"][0]["text"].as_str().unwrap();
+            assert!(html.contains("ui/notifications/tool-result"), "{} widget must listen for results", uri);
+            assert!(html.contains("ui/initialize"), "{} widget must handshake", uri);
+        }
     }
 }

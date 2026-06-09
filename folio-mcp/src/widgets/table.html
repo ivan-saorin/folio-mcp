@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 0; padding: 12px; }
+  h3 { margin: 16px 0 6px; font: 600 13px/1.4 system-ui, sans-serif; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+  th, td { text-align: left; padding: 4px 10px; border-bottom: 1px solid rgba(128,128,128,.25); vertical-align: top; }
+  th { font: 600 12px/1.4 system-ui, sans-serif; opacity: .7; }
+  td.result { font-weight: 600; }
+  tr.err td { background: rgba(220,40,40,.12); }
+  td.result.err { color: #c0392b; }
+  .empty { opacity: .55; padding: 12px; }
+</style>
+</head>
+<body>
+<div id="root"><div class="empty">Waiting for results…</div></div>
+<script>
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m];});}
+  function render(sc){
+    var root=document.getElementById("root");
+    if(!sc||!Array.isArray(sc.cells)||sc.cells.length===0){root.innerHTML='<div class="empty">No cells to display.</div>';return;}
+    var groups={},order=[];
+    sc.cells.forEach(function(c){var s=c.section||"";if(!(s in groups)){groups[s]=[];order.push(s);}groups[s].push(c);});
+    var html="";
+    order.forEach(function(s){
+      if(s) html+="<h3>"+esc(s)+"</h3>";
+      html+="<table><thead><tr><th>name</th><th>formula</th><th>result</th></tr></thead><tbody>";
+      groups[s].forEach(function(c){
+        var e=!!c.isError;
+        html+='<tr class="'+(e?"err":"")+'"><td>'+esc(c.name)+"</td><td>"+esc(c.formula)+'</td><td class="result '+(e?"err":"")+'">'+esc(c.result)+"</td></tr>";
+      });
+      html+="</tbody></table>";
+    });
+    root.innerHTML=html;
+  }
+  window.addEventListener("message",function(ev){
+    var m=ev.data||{};
+    if(m.method==="ui/notifications/tool-result"&&m.params){render(m.params.structuredContent);}
+  });
+  window.parent.postMessage({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{}},"*");
+</script>
+</body>
+</html>

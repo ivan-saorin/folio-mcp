@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 0; padding: 12px; }
+  h3 { margin: 14px 0 6px; font: 600 13px/1.4 system-ui, sans-serif; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+  th, td { text-align: left; padding: 4px 10px; border-bottom: 1px solid rgba(128,128,128,.25); vertical-align: top; }
+  th { font: 600 12px/1.4 system-ui, sans-serif; opacity: .7; }
+  .empty { opacity: .55; padding: 12px; }
+</style>
+</head>
+<body>
+<div id="root"><div class="empty">Waiting for results…</div></div>
+<script>
+  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m];});}
+  function kv(o){return Object.keys(o||{}).map(function(k){return k+"="+esc(o[k]);}).join(", ");}
+  function render(sc){
+    var root=document.getElementById("root");
+    if(!sc||!Array.isArray(sc.runs)){root.innerHTML='<div class="empty">No runs to display.</div>';return;}
+    var html="";
+    if(Array.isArray(sc.comparison)&&sc.comparison.length){
+      html+="<h3>Comparison"+(sc.compareField?(" — "+esc(sc.compareField)):"")+"</h3>";
+      html+="<table><thead><tr><th>#</th><th>variables</th><th>value</th></tr></thead><tbody>";
+      sc.comparison.forEach(function(r){html+="<tr><td>"+esc(r.index)+"</td><td>"+kv(r.variables)+"</td><td>"+esc(r.value)+"</td></tr>";});
+      html+="</tbody></table>";
+    }
+    html+="<h3>Runs</h3><table><thead><tr><th>#</th><th>variables</th><th>values</th></tr></thead><tbody>";
+    sc.runs.forEach(function(r){html+="<tr><td>"+esc(r.index)+"</td><td>"+kv(r.variables)+"</td><td>"+kv(r.values)+"</td></tr>";});
+    html+="</tbody></table>";
+    root.innerHTML=html;
+  }
+  window.addEventListener("message",function(ev){
+    var m=ev.data||{};
+    if(m.method==="ui/notifications/tool-result"&&m.params){render(m.params.structuredContent);}
+  });
+  window.parent.postMessage({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{}},"*");
+</script>
+</body>
+</html>
