@@ -675,7 +675,7 @@ fn calculate_rate(
         let factor_deriv = nper.mul(&factor).checked_div(&one.add(rate)).unwrap_or_else(|_| Number::from_i64(0));
 
         // d/dr[pv * factor] = pv * factor_deriv
-        let pv_deriv = pv.mul(&factor_deriv);
+        let _pv_deriv = pv.mul(&factor_deriv);
 
         // d/dr[pmt * (factor - 1) / r * type_adj] is more complex
         // Approximate with numerical derivative for robustness

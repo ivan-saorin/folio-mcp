@@ -3,7 +3,7 @@
 use folio_plugin::prelude::*;
 use folio_core::Number;
 use nalgebra::DMatrix;
-use crate::types::{Matrix, Vector, MatrixMode, ExactMatrix, FloatMatrix};
+use crate::types::{Matrix, Vector, MatrixMode, ExactMatrix};
 use crate::helpers::*;
 
 // ============ get ============

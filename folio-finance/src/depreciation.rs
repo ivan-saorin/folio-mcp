@@ -189,12 +189,12 @@ fn calculate_ddb(
 ) -> Result<Number, FolioError> {
     // Rate = factor / life
     let rate = factor.checked_div(life)?;
-    let one = Number::from_i64(1);
+    let _one = Number::from_i64(1);
 
     // Calculate book value at start of period
     let mut book_value = cost.clone();
 
-    for p in 1..period {
+    for _p in 1..period {
         let depreciation = book_value.mul(&rate);
         book_value = book_value.sub(&depreciation);
 

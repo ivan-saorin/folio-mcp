@@ -68,6 +68,7 @@ pub fn validate_rate(rate: &Number, func: &str) -> Result<(), FolioError> {
 }
 
 /// Validate that nper is positive
+#[allow(dead_code)]
 pub fn validate_nper(nper: &Number, func: &str) -> Result<(), FolioError> {
     if nper.is_zero() || nper.is_negative() {
         return Err(FolioError::domain_error(format!(
@@ -86,7 +87,7 @@ pub fn newton_raphson<F, D>(
     df: D,
     max_iter: usize,
     tol: &Number,
-    precision: u32,
+    _precision: u32,
 ) -> Option<Number>
 where
     F: Fn(&Number) -> Number,

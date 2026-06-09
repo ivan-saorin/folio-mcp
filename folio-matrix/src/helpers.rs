@@ -104,7 +104,7 @@ fn extract_matrix_from_nested_list(rows: &[Value], func: &str, arg: &str) -> Res
 /// Extract a vector from a Value
 pub fn extract_vector(value: &Value, func: &str, arg: &str) -> Result<Vector, FolioError> {
     match value {
-        Value::List(items) => {
+        Value::List(_items) => {
             let numbers = extract_number_list(value, func, arg)?;
             Ok(Vector::from_list(numbers, MatrixMode::Auto))
         }
@@ -138,6 +138,7 @@ pub fn parse_mode(value: Option<&Value>) -> MatrixMode {
 }
 
 /// Get precision from context
+#[allow(dead_code)]
 pub fn get_precision(ctx: &EvalContext) -> u32 {
     ctx.precision
 }

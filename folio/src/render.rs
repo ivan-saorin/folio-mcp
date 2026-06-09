@@ -28,6 +28,7 @@ pub struct DateTimeFormats {
     /// Format for Date values (default: YYYY-MM-DD)
     pub date_fmt: Option<String>,
     /// Format for Time values (default: HH:mm:ss)
+    #[allow(dead_code)]
     pub time_fmt: Option<String>,
     /// Format for DateTime values (default: ISO 8601)
     pub datetime_fmt: Option<String>,

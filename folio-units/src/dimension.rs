@@ -6,13 +6,21 @@
 use std::fmt;
 use serde::{Serialize, Deserialize};
 
-/// Dimension indices for the 7 SI base quantities
+/// Dimension indices for the 7 SI base quantities.
+/// Kept as a complete, documented set; not all indices are referenced yet.
+#[allow(dead_code)]
 pub const LENGTH: usize = 0;
+#[allow(dead_code)]
 pub const MASS: usize = 1;
+#[allow(dead_code)]
 pub const TIME: usize = 2;
+#[allow(dead_code)]
 pub const CURRENT: usize = 3;
+#[allow(dead_code)]
 pub const TEMPERATURE: usize = 4;
+#[allow(dead_code)]
 pub const AMOUNT: usize = 5;
+#[allow(dead_code)]
 pub const LUMINOSITY: usize = 6;
 
 /// Represents the dimensions of a physical quantity

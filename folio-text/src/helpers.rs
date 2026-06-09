@@ -36,6 +36,7 @@ pub fn extract_optional_text<'a>(args: &'a [Value], index: usize) -> Option<&'a 
 }
 
 /// Extract integer from Value
+#[allow(dead_code)]
 pub fn extract_int(value: &Value, func: &str, arg: &str) -> Result<i64, FolioError> {
     match value {
         Value::Number(n) => n.to_i64().ok_or_else(|| {
@@ -93,6 +94,7 @@ pub fn get_regex(pattern: &str) -> Result<Regex, FolioError> {
 }
 
 /// Convert character index to byte position (handling Unicode)
+#[allow(dead_code)]
 pub fn char_to_byte_index(s: &str, char_idx: usize) -> Option<usize> {
     s.char_indices().nth(char_idx).map(|(i, _)| i)
 }

@@ -200,6 +200,7 @@ struct FmdFileInfo {
 // MCP Protocol types
 #[derive(Debug, Deserialize)]
 struct McpRequest {
+    #[allow(dead_code)]
     jsonrpc: String,
     id: Option<JsonValue>,
     method: String,

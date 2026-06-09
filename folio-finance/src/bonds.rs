@@ -159,11 +159,11 @@ fn calculate_bond_price(
     }
 
     // Fractional period from settlement to next coupon
-    let fraction = Number::from_str("1.0").unwrap(); // Simplified - assume full period
+    let _fraction = Number::from_str("1.0").unwrap(); // Simplified - assume full period
 
     // Price = sum of PV of coupons + PV of redemption
     let mut price = Number::from_i64(0);
-    let discount_factor = one.add(&yld_per_period);
+    let _discount_factor = one.add(&yld_per_period);
 
     // PV of coupon payments
     for i in 1..=n_periods {
@@ -465,7 +465,7 @@ fn calculate_duration(
     precision: u32,
 ) -> Result<Number, FolioError> {
     let freq_num = Number::from_i64(frequency);
-    let one = Number::from_i64(1);
+    let _one = Number::from_i64(1);
     let hundred = Number::from_i64(100);
 
     // Coupon per period
@@ -765,7 +765,7 @@ fn calculate_convexity(
 ) -> Result<Number, FolioError> {
     let freq_num = Number::from_i64(frequency);
     let one = Number::from_i64(1);
-    let two = Number::from_i64(2);
+    let _two = Number::from_i64(2);
     let hundred = Number::from_i64(100);
 
     // Coupon per period
@@ -904,7 +904,7 @@ impl FunctionPlugin for Accrint {
                 other.type_name(),
             )),
         };
-        let first_interest = match &args[1] {
+        let _first_interest = match &args[1] {
             Value::DateTime(dt) => dt.clone(),
             Value::Error(e) => return Value::Error(e.clone()),
             other => return Value::Error(FolioError::arg_type(
@@ -939,7 +939,7 @@ impl FunctionPlugin for Accrint {
 
         // Days from issue (or last coupon) to settlement
         let days_accrued = days_between(&issue, &settlement);
-        let days_in_period = 365 / frequency;
+        let _days_in_period = 365 / frequency;
 
         // Accrued interest = par * rate * (days_accrued / days_in_year)
         let year_fraction = Number::from_ratio(days_accrued, 365);

@@ -71,7 +71,7 @@ impl FunctionPlugin for EffectiveRate {
             Err(e) => return Value::Error(e.into()),
         };
 
-        let base = one.add(&rate_per_period);
+        let _base = one.add(&rate_per_period);
         let effective = compound_factor(&rate_per_period, &periods, precision).sub(&one);
 
         Value::Number(effective)

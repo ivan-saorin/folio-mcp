@@ -82,7 +82,7 @@ impl Unit {
     }
 
     /// Convert a value from SI base unit to this unit
-    pub fn from_si(&self, value_si: &Number, precision: u32) -> Result<Number, folio_core::NumberError> {
+    pub fn from_si(&self, value_si: &Number, _precision: u32) -> Result<Number, folio_core::NumberError> {
         // value = (value_si - offset) / factor
         let shifted = value_si.sub(&self.to_si_offset);
         shifted.checked_div(&self.to_si_factor)
@@ -106,7 +106,7 @@ impl Unit {
     }
 
     /// Get the inverse unit (e.g., Hz -> s)
-    pub fn inverse(&self, precision: u32) -> Result<Unit, folio_core::NumberError> {
+    pub fn inverse(&self, _precision: u32) -> Result<Unit, folio_core::NumberError> {
         let one = Number::from_i64(1);
         let inv_factor = one.checked_div(&self.to_si_factor)?;
 
@@ -133,7 +133,7 @@ impl Unit {
     }
 
     /// Divide two units (e.g., m / s -> m/s)
-    pub fn divide(&self, other: &Unit, precision: u32) -> Result<Unit, folio_core::NumberError> {
+    pub fn divide(&self, other: &Unit, _precision: u32) -> Result<Unit, folio_core::NumberError> {
         let factor = self.to_si_factor.checked_div(&other.to_si_factor)?;
 
         Ok(Unit {

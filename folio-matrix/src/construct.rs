@@ -2,7 +2,7 @@
 
 use folio_plugin::prelude::*;
 use folio_core::Number;
-use crate::types::{Matrix, Vector, MatrixMode, ExactMatrix};
+use crate::types::{Matrix, Vector, MatrixMode};
 use crate::helpers::*;
 
 // ============ matrix ============
@@ -53,7 +53,7 @@ impl FunctionPlugin for MatrixFn {
             return Value::Error(FolioError::arg_count("matrix", 1, 0));
         }
 
-        let mode = parse_mode(args.get(1));
+        let _mode = parse_mode(args.get(1));
         match extract_matrix(&args[0], "matrix", "data") {
             Ok(m) => m.into(),
             Err(e) => Value::Error(e),

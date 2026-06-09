@@ -1039,7 +1039,7 @@ fn mean(numbers: &[Number]) -> Number {
     sum.checked_div(&Number::from_i64(numbers.len() as i64)).unwrap_or_else(|_| Number::from_i64(0))
 }
 
-fn variance(numbers: &[Number], precision: u32) -> Number {
+fn variance(numbers: &[Number], _precision: u32) -> Number {
     if numbers.len() < 2 {
         return Number::from_i64(0);
     }

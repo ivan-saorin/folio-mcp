@@ -551,7 +551,7 @@ fn calculate_irr(cash_flows: &[Number], guess: &Number, precision: u32) -> Resul
 
     // NPV function
     let npv_f = |rate: &Number| -> Number {
-        let one = Number::from_i64(1);
+        let _one = Number::from_i64(1);
         let mut npv = Number::from_i64(0);
         for (i, cf) in cash_flows.iter().enumerate() {
             let period = Number::from_i64(i as i64);
