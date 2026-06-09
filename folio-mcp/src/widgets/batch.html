@@ -21,9 +21,17 @@
   function kv(o){return Object.keys(o||{}).map(function(k){return esc(k)+"="+esc(o[k]);}).join(", ");}
   function diag(s){var d=document.getElementById("diag");if(d){d.textContent+=(d.textContent?" · ":"")+s;}}
   function send(msg){window.parent.postMessage(msg,"*");}
+  // Flexible-dimension Views MUST report their content size or the host leaves
+  // the iframe at ~zero height (invisible). Report on load, after render, and
+  // on any layout change via ResizeObserver (per SEP-1865).
+  function reportSize(){
+    var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight,1);
+    var w=Math.max(document.body.scrollWidth,document.documentElement.scrollWidth,1);
+    send({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{width:w,height:h}});
+  }
   function render(sc){
     var root=document.getElementById("root");
-    if(!sc||!Array.isArray(sc.runs)){root.innerHTML='<div class="empty">No runs to display.</div>';return;}
+    if(!sc||!Array.isArray(sc.runs)){root.innerHTML='<div class="empty">No runs to display.</div>';reportSize();return;}
     var html="";
     if(Array.isArray(sc.comparison)&&sc.comparison.length){
       html+="<h3>Comparison"+(sc.compareField?(" — "+esc(sc.compareField)):"")+"</h3>";
@@ -35,18 +43,18 @@
     sc.runs.forEach(function(r){html+="<tr><td>"+esc(r.index)+"</td><td>"+kv(r.variables)+"</td><td>"+kv(r.values)+"</td></tr>";});
     html+="</tbody></table>";
     root.innerHTML=html;
+    reportSize();
   }
   window.addEventListener("message",function(ev){
     var m=ev.data||{};
     diag(m.method||((m.id===1&&m.result)?"init-result":"msg"));
-    // Host answered our ui/initialize -> announce readiness. Per SEP-1865 the
-    // host only sends tool data AFTER this `initialized` notification.
-    if(m.id===1&&m.result){send({jsonrpc:"2.0",method:"ui/notifications/initialized"});return;}
+    if(m.id===1&&m.result){send({jsonrpc:"2.0",method:"ui/notifications/initialized"});reportSize();return;}
     if(m.method==="ui/notifications/tool-result"&&m.params){render(m.params.structuredContent);}
   });
-  // MCP Apps handshake, step 1.
   send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",clientInfo:{name:"folio-batch",version:"1"},appCapabilities:{}}});
   diag("sent ui/initialize");
+  try{ new ResizeObserver(function(){reportSize();}).observe(document.body); }catch(e){}
+  reportSize();
 </script>
 </body>
 </html>

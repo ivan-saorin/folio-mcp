@@ -23,9 +23,17 @@
   function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m];});}
   function diag(s){var d=document.getElementById("diag");if(d){d.textContent+=(d.textContent?" · ":"")+s;}}
   function send(msg){window.parent.postMessage(msg,"*");}
+  // Flexible-dimension Views MUST report their content size or the host leaves
+  // the iframe at ~zero height (invisible). Report on load, after render, and
+  // on any layout change via ResizeObserver (per SEP-1865).
+  function reportSize(){
+    var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight,1);
+    var w=Math.max(document.body.scrollWidth,document.documentElement.scrollWidth,1);
+    send({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{width:w,height:h}});
+  }
   function render(sc){
     var root=document.getElementById("root");
-    if(!sc||!Array.isArray(sc.cells)||sc.cells.length===0){root.innerHTML='<div class="empty">No cells to display.</div>';return;}
+    if(!sc||!Array.isArray(sc.cells)||sc.cells.length===0){root.innerHTML='<div class="empty">No cells to display.</div>';reportSize();return;}
     var groups={},order=[];
     sc.cells.forEach(function(c){var s=c.section||"";if(!(s in groups)){groups[s]=[];order.push(s);}groups[s].push(c);});
     var html="";
@@ -39,18 +47,20 @@
       html+="</tbody></table>";
     });
     root.innerHTML=html;
+    reportSize();
   }
   window.addEventListener("message",function(ev){
     var m=ev.data||{};
     diag(m.method||((m.id===1&&m.result)?"init-result":"msg"));
-    // Host answered our ui/initialize -> announce readiness. Per SEP-1865 the
-    // host only sends tool data AFTER this `initialized` notification.
-    if(m.id===1&&m.result){send({jsonrpc:"2.0",method:"ui/notifications/initialized"});return;}
+    // Host answered our ui/initialize -> announce readiness, then report size.
+    if(m.id===1&&m.result){send({jsonrpc:"2.0",method:"ui/notifications/initialized"});reportSize();return;}
     if(m.method==="ui/notifications/tool-result"&&m.params){render(m.params.structuredContent);}
   });
   // MCP Apps handshake, step 1.
   send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",clientInfo:{name:"folio-table",version:"1"},appCapabilities:{}}});
   diag("sent ui/initialize");
+  try{ new ResizeObserver(function(){reportSize();}).observe(document.body); }catch(e){}
+  reportSize();
 </script>
 </body>
 </html>
