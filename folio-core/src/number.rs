@@ -398,6 +398,18 @@ impl Number {
         }
     }
 
+    /// Render at full computed precision (no f64 round-trip), trimming trailing
+    /// zeros. Used for display so high-precision values are not truncated to f64.
+    pub fn as_full_decimal(&self) -> String {
+        let s = format!("{}", self.inner);
+        if s.contains('.') && !s.contains('e') && !s.contains('E') {
+            let t = s.trim_end_matches('0').trim_end_matches('.');
+            if t.is_empty() || t == "-" { "0".to_string() } else { t.to_string() }
+        } else {
+            s
+        }
+    }
+
     /// Render with N significant figures
     pub fn as_sigfigs(&self, sigfigs: u32) -> String {
         if let Some(f) = self.to_f64() {

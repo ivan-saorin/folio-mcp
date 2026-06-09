@@ -141,6 +141,29 @@ mod tests {
         assert_eq!(x.as_number().unwrap().to_i64(), Some(1024));
     }
 
+    #[test]
+    fn test_full_precision_display_not_capped() {
+        let folio = test_folio();
+        let doc = r#"
+## P @precision:50
+| name | formula | result |
+|------|---------|--------|
+| phi | (1 + sqrt(5)) / 2 | |
+| rev | 120 * 1000 | |
+| half | 1 / 2 | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+        // Exact values render clean (no trailing-zero padding).
+        assert_eq!(result.values.get("rev").unwrap().as_number().unwrap().as_full_decimal(), "120000");
+        assert_eq!(result.values.get("half").unwrap().as_number().unwrap().as_full_decimal(), "0.5");
+        // High-precision value is NOT capped at ~10 digits (the old f64 behavior).
+        let phi = result.values.get("phi").unwrap().as_number().unwrap().as_full_decimal();
+        assert!(phi.starts_with("1.6180339887"), "phi: {}", phi);
+        assert!(phi.len() > 25, "phi should show high precision, got: {}", phi);
+        // Rendered markdown reflects full precision, not the old 10-place cap.
+        assert!(!result.markdown.contains("120000.0000000000"), "rendered should not 10-cap:\n{}", result.markdown);
+    }
+
     // Note: This test is disabled due to stack overflow with BigRational growing too large
     // with Newton-Raphson iterations. The sqrt function works correctly for smaller inputs.
     // #[test]

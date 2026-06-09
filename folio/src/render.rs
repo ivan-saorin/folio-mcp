@@ -149,7 +149,7 @@ impl Renderer {
     fn render_value(&self, value: &Value, num_format: NumberFormat, dt_formats: &DateTimeFormats) -> String {
         match value {
             Value::Number(n) => match num_format {
-                NumberFormat::Decimal(places) => n.as_decimal(places),
+                NumberFormat::Decimal(_places) => n.as_full_decimal(),
                 NumberFormat::SigFigs(sigfigs) => n.as_sigfigs(sigfigs),
             },
             Value::Text(s) => s.clone(),
