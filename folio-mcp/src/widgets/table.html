@@ -18,7 +18,7 @@
 <body>
 <div id="root"><div class="empty">Waiting for results…</div></div>
 <script>
-  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m];});}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m];});}
   function render(sc){
     var root=document.getElementById("root");
     if(!sc||!Array.isArray(sc.cells)||sc.cells.length===0){root.innerHTML='<div class="empty">No cells to display.</div>';return;}

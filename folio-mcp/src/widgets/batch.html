@@ -15,8 +15,8 @@
 <body>
 <div id="root"><div class="empty">Waiting for results…</div></div>
 <script>
-  function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m];});}
-  function kv(o){return Object.keys(o||{}).map(function(k){return k+"="+esc(o[k]);}).join(", ");}
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m];});}
+  function kv(o){return Object.keys(o||{}).map(function(k){return esc(k)+"="+esc(o[k]);}).join(", ");}
   function render(sc){
     var root=document.getElementById("root");
     if(!sc||!Array.isArray(sc.runs)){root.innerHTML='<div class="empty">No runs to display.</div>';return;}
