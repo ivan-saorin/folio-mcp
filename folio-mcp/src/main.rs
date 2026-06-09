@@ -460,7 +460,7 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
             {
                 "name": "eval",
                 "title": "Evaluate Folio Document",
-                "description": "Evaluate a Folio markdown document with formulas. Returns a complete, auditable results table (one row per named cell) intended to be shown to the user in full.",
+                "description": "Evaluate a Folio markdown document with formulas. Returns a complete, auditable results table (one row per named cell) designed to be shown to the user in full; do not summarize, truncate, or paraphrase it.",
                 "annotations": { "readOnlyHint": true, "openWorldHint": false },
                 "outputSchema": {
                     "type": "object",
@@ -503,7 +503,7 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
             {
                 "name": "eval_file",
                 "title": "Evaluate Folio File",
-                "description": "Evaluate a .fmd file from the data directory by name. Returns a complete, auditable results table intended to be shown to the user in full.",
+                "description": "Evaluate a .fmd file from the data directory by name. Returns a complete, auditable results table designed to be shown to the user in full; do not summarize, truncate, or paraphrase it.",
                 "annotations": { "readOnlyHint": true, "openWorldHint": false },
                 "outputSchema": {
                     "type": "object",
