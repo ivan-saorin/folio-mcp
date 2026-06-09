@@ -3,6 +3,7 @@
 //! Renders evaluated document back to markdown with results.
 
 use crate::ast::Document;
+use crate::eval::CellResult;
 use folio_core::Value;
 use std::collections::HashMap;
 
@@ -40,34 +41,50 @@ impl Renderer {
         Self
     }
 
-    /// Render document with computed values
+    /// Render document with computed values (markdown only).
     pub fn render(
         &self,
         doc: &Document,
         values: &HashMap<String, Value>,
         external: &HashMap<String, Value>,
     ) -> String {
-        let mut output = String::new();
+        self.render_with_cells(doc, values, external).0
+    }
 
-        // Render external variables section if any
+    /// Render document, returning the markdown AND the ordered structured cells.
+    /// Both are produced from the same `render_value` call, so the cell `result`
+    /// strings are byte-for-byte identical to the markdown table.
+    pub fn render_with_cells(
+        &self,
+        doc: &Document,
+        values: &HashMap<String, Value>,
+        external: &HashMap<String, Value>,
+    ) -> (String, Vec<CellResult>) {
+        let mut output = String::new();
+        let mut cells_out: Vec<CellResult> = Vec::new();
+
+        // Render external variables section if any (not collected as cells).
         if !external.is_empty() {
             output.push_str("## External Variables\n\n");
             output.push_str("| name | value |\n");
             output.push_str("|------|-------|\n");
             let default_dt_formats = DateTimeFormats::default();
             for (name, value) in external {
-                output.push_str(&format!("| {} | {} |\n", name, self.render_value(value, NumberFormat::default(), &default_dt_formats)));
+                output.push_str(&format!(
+                    "| {} | {} |\n",
+                    name,
+                    self.render_value(value, NumberFormat::default(), &default_dt_formats)
+                ));
             }
             output.push('\n');
         }
 
-        // Render each section
         for section in &doc.sections {
             output.push_str(&format!("## {}", section.name));
 
-            // Add attributes if any
             if !section.attributes.is_empty() {
-                let attrs: Vec<String> = section.attributes
+                let attrs: Vec<String> = section
+                    .attributes
                     .iter()
                     .map(|(k, v)| format!("{}:{}", k, v))
                     .collect();
@@ -75,29 +92,36 @@ impl Renderer {
             }
             output.push_str("\n\n");
 
-            // Determine formats from section attributes
             let num_format = self.get_number_format(&section.attributes);
             let dt_formats = self.get_datetime_formats(&section.attributes);
 
-            // Render table header
             output.push_str("| name | formula | result |\n");
             output.push_str("|------|---------|--------|\n");
 
-            // Rows
             for row in &section.table.rows {
                 for cell in &row.cells {
-                    let result = values.get(&cell.name)
+                    let value = values.get(&cell.name);
+                    let result = value
                         .map(|v| self.render_value(v, num_format, &dt_formats))
                         .unwrap_or_default();
-                    output.push_str(&format!("| {} | {} | {} |\n",
-                        cell.name, cell.raw_text, result));
+                    output.push_str(&format!(
+                        "| {} | {} | {} |\n",
+                        cell.name, cell.raw_text, result
+                    ));
+                    cells_out.push(CellResult {
+                        name: cell.name.clone(),
+                        formula: cell.raw_text.clone(),
+                        result,
+                        is_error: value.map(|v| v.is_error()).unwrap_or(false),
+                        section: section.name.clone(),
+                    });
                 }
             }
 
             output.push('\n');
         }
 
-        output
+        (output, cells_out)
     }
 
     /// Get number format from section attributes

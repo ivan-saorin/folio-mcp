@@ -7,6 +7,16 @@ use folio_plugin::EvalContext;
 use folio_core::{Value, FolioError, Number};
 use std::collections::{HashMap, HashSet, VecDeque};
 
+/// One row of the rendered results table, formatted identically to the markdown.
+#[derive(Debug, Clone)]
+pub struct CellResult {
+    pub name: String,
+    pub formula: String,   // original formula text (Cell::raw_text)
+    pub result: String,    // renderer-formatted, matches the markdown cell verbatim
+    pub is_error: bool,
+    pub section: String,   // owning section name, for grouping in the widget
+}
+
 /// Result of document evaluation
 #[derive(Debug)]
 pub struct EvalResult {
@@ -14,6 +24,8 @@ pub struct EvalResult {
     pub markdown: String,
     /// All computed values by cell name
     pub values: HashMap<String, Value>,
+    /// Ordered structured cells, formatted identically to the markdown table
+    pub cells: Vec<CellResult>,
     /// Errors encountered
     pub errors: Vec<FolioError>,
     /// Warnings (non-fatal)
@@ -26,6 +38,7 @@ impl EvalResult {
         Self {
             markdown: format!("# Parse Error\n\n{}", error),
             values: HashMap::new(),
+            cells: vec![],
             errors: vec![error],
             warnings: vec![],
         }

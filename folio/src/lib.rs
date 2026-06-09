@@ -6,7 +6,7 @@ mod eval;
 mod render;
 
 pub use ast::{Document, Section, Table, Row, Cell, Expr};
-pub use eval::{Evaluator, EvalResult};
+pub use eval::{Evaluator, EvalResult, CellResult};
 pub use render::Renderer;
 
 use folio_plugin::{PluginRegistry, EvalContext};
@@ -58,11 +58,12 @@ impl Folio {
         let values = evaluator.eval(&doc, &mut ctx);
         
         let renderer = Renderer::new();
-        let markdown = renderer.render(&doc, &values, variables);
-        
+        let (markdown, cells) = renderer.render_with_cells(&doc, &values, variables);
+
         EvalResult {
             markdown,
             values,
+            cells,
             errors: ctx.trace.iter()
                 .filter_map(|s| if let Value::Error(e) = &s.result { Some(e.clone()) } else { None })
                 .collect(),
@@ -1228,5 +1229,36 @@ mod tests {
         let ends_world = result.values.get("ends_world").unwrap();
         assert!(!ends_world.is_error(), "ends_with should work, got: {:?}", ends_world);
         assert_eq!(ends_world.as_bool(), Some(true), "should end with 'World'");
+    }
+
+    #[test]
+    fn test_eval_result_has_ordered_renderer_matched_cells() {
+        let folio = test_folio();
+        let doc = r#"
+## Demo
+| name | formula | result |
+|------|---------|--------|
+| a | 10 | |
+| b | a * 2 | |
+"#;
+        let result = folio.eval(doc, &HashMap::new());
+
+        // Ordered, with original formula text and section label.
+        assert_eq!(result.cells.len(), 2);
+        assert_eq!(result.cells[0].name, "a");
+        assert_eq!(result.cells[1].name, "b");
+        assert_eq!(result.cells[1].formula, "a * 2");
+        assert_eq!(result.cells[0].section, "Demo");
+        assert!(!result.cells[1].is_error);
+
+        // Fidelity: each cell's result string is exactly what the markdown shows.
+        assert!(
+            result.markdown.contains(&format!(
+                "| b | a * 2 | {} |",
+                result.cells[1].result
+            )),
+            "cell result must match markdown verbatim; markdown was:\n{}",
+            result.markdown
+        );
     }
 }
