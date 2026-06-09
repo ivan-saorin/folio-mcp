@@ -352,7 +352,7 @@ fn handle_request(folio: &Folio, request: &McpRequest) -> McpResponse {
         "ping" => Ok(json!({})),
 
         // Tools
-        "tools/list" => handle_tools_list(),
+        "tools/list" => handle_tools_list(false),
         "tools/call" => handle_tool_call(folio, &request.params),
 
         // Resources
@@ -424,12 +424,34 @@ fn handle_initialize(params: &Option<JsonValue>) -> Result<JsonValue, McpError> 
     }))
 }
 
-fn handle_tools_list() -> Result<JsonValue, McpError> {
+fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
+    // Used in a later task to conditionally attach UI linkage; referenced here
+    // to silence the unused-variable warning without renaming the parameter.
+    let _ = client_ui_support;
     Ok(json!({
         "tools": [
             {
                 "name": "eval",
+                "title": "Evaluate Folio Document",
                 "description": "Evaluate a Folio markdown document with formulas. Returns a complete, auditable results table (one row per named cell) intended to be shown to the user in full.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
+                "outputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "cells": { "type": "array", "items": { "type": "object",
+                            "properties": {
+                                "name": {"type":"string"}, "formula": {"type":"string"},
+                                "result": {"type":"string"}, "isError": {"type":"boolean"},
+                                "section": {"type":"string"}
+                            },
+                            "required": ["name","formula","result"] } },
+                        "markdown": { "type": "string" },
+                        "errors": { "type": "array", "items": { "type": "object",
+                            "properties": { "code":{"type":"string"}, "message":{"type":"string"}, "cell":{"type":"string"} } } },
+                        "isError": { "type": "boolean" }
+                    },
+                    "required": ["cells"]
+                },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -453,7 +475,26 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "eval_file",
+                "title": "Evaluate Folio File",
                 "description": "Evaluate a .fmd file from the data directory by name. Returns a complete, auditable results table intended to be shown to the user in full.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
+                "outputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "cells": { "type": "array", "items": { "type": "object",
+                            "properties": {
+                                "name": {"type":"string"}, "formula": {"type":"string"},
+                                "result": {"type":"string"}, "isError": {"type":"boolean"},
+                                "section": {"type":"string"}
+                            },
+                            "required": ["name","formula","result"] } },
+                        "markdown": { "type": "string" },
+                        "errors": { "type": "array", "items": { "type": "object",
+                            "properties": { "code":{"type":"string"}, "message":{"type":"string"}, "cell":{"type":"string"} } } },
+                        "isError": { "type": "boolean" }
+                    },
+                    "required": ["cells"]
+                },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -476,7 +517,21 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "eval_batch",
+                "title": "Folio Parameter Sweep",
                 "description": "Evaluate a template with multiple variable sets for parameter sweeps.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
+                "outputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "runs": { "type": "array", "items": { "type": "object",
+                            "properties": { "index":{"type":"integer"}, "variables":{"type":"object"},
+                                "values":{"type":"object"}, "isError":{"type":"boolean"} },
+                            "required": ["index","values"] } },
+                        "comparison": { "type": "array" },
+                        "compareField": { "type": ["string","null"] }
+                    },
+                    "required": ["runs"]
+                },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -499,7 +554,9 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "folio",
+                "title": "Folio Help",
                 "description": "Get documentation for a function, constant, or general help about Folio.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -517,7 +574,9 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "quick",
+                "title": "Folio Quick Reference",
                 "description": "Compact quick reference (~400 tokens). Lists function names grouped by category with Object return fields.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
                 "inputSchema": {
                     "type": "object",
                     "properties": {}
@@ -525,7 +584,10 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "list_functions",
+                "title": "List Folio Functions",
                 "description": "List all available functions, optionally by category.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
+                "outputSchema": { "type": "object", "properties": { "functions": { "type": "array" } }, "required": ["functions"] },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -539,7 +601,10 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "list_constants",
+                "title": "List Folio Constants",
                 "description": "List available mathematical constants with sources.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
+                "outputSchema": { "type": "object", "properties": { "constants": { "type": "array" } }, "required": ["constants"] },
                 "inputSchema": {
                     "type": "object",
                     "properties": {}
@@ -547,7 +612,9 @@ fn handle_tools_list() -> Result<JsonValue, McpError> {
             },
             {
                 "name": "decompose",
+                "title": "Decompose Value",
                 "description": "Analyze a value for patterns involving φ, π, e.",
+                "annotations": { "readOnlyHint": true, "openWorldHint": false },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -1329,5 +1396,20 @@ mod tests {
         let dc = tool_decompose(&folio, json!({"value": "1.618"})).unwrap();
         assert!(dc.get("patterns").is_none(), "decompose must not use top-level 'patterns'");
         assert!(dc.get("_note").is_none());
+    }
+
+    #[test]
+    fn test_tools_list_metadata() {
+        let res = handle_tools_list(false).unwrap();
+        let tools = res["tools"].as_array().unwrap();
+        for t in tools {
+            assert!(t["title"].is_string(), "{} missing title", t["name"]);
+            assert_eq!(t["annotations"]["readOnlyHint"], true, "{} readOnlyHint", t["name"]);
+            assert_eq!(t["annotations"]["openWorldHint"], false, "{} openWorldHint", t["name"]);
+        }
+        let eval = tools.iter().find(|t| t["name"] == "eval").unwrap();
+        assert!(eval["outputSchema"]["properties"]["cells"].is_object());
+        // No UI linkage when the client does not support the extension.
+        assert!(eval.get("_meta").is_none());
     }
 }
