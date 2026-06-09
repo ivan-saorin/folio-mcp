@@ -37,7 +37,7 @@ const SERVER_NAME: &str = "folio";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Bump on each diagnostic rebuild so the `version` tool and `serverInfo`
 /// reveal exactly which build a client (e.g. Claude Desktop) is connected to.
-const BUILD_TAG: &str = "2026-06-09-version-tool";
+const BUILD_TAG: &str = "2026-06-09-widget-handshake";
 
 const WIDGET_TABLE_HTML: &str = include_str!("widgets/table.html");
 const WIDGET_BATCH_HTML: &str = include_str!("widgets/batch.html");
@@ -1624,6 +1624,7 @@ mod tests {
             let html = res["contents"][0]["text"].as_str().unwrap();
             assert!(html.contains("ui/notifications/tool-result"), "{} widget must listen for results", uri);
             assert!(html.contains("ui/initialize"), "{} widget must handshake", uri);
+            assert!(html.contains("ui/notifications/initialized"), "{} widget must complete the handshake (initialized)", uri);
         }
     }
 }

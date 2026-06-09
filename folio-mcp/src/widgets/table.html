@@ -13,12 +13,16 @@
   tr.err td { background: rgba(220,40,40,.12); }
   td.result.err { color: #c0392b; }
   .empty { opacity: .55; padding: 12px; }
+  #diag { margin-top: 10px; font: 11px/1.4 ui-monospace, monospace; opacity: .4; }
 </style>
 </head>
 <body>
 <div id="root"><div class="empty">Waiting for results…</div></div>
+<div id="diag"></div>
 <script>
   function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m];});}
+  function diag(s){var d=document.getElementById("diag");if(d){d.textContent+=(d.textContent?" · ":"")+s;}}
+  function send(msg){window.parent.postMessage(msg,"*");}
   function render(sc){
     var root=document.getElementById("root");
     if(!sc||!Array.isArray(sc.cells)||sc.cells.length===0){root.innerHTML='<div class="empty">No cells to display.</div>';return;}
@@ -38,9 +42,15 @@
   }
   window.addEventListener("message",function(ev){
     var m=ev.data||{};
+    diag(m.method||((m.id===1&&m.result)?"init-result":"msg"));
+    // Host answered our ui/initialize -> announce readiness. Per SEP-1865 the
+    // host only sends tool data AFTER this `initialized` notification.
+    if(m.id===1&&m.result){send({jsonrpc:"2.0",method:"ui/notifications/initialized"});return;}
     if(m.method==="ui/notifications/tool-result"&&m.params){render(m.params.structuredContent);}
   });
-  window.parent.postMessage({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{}},"*");
+  // MCP Apps handshake, step 1.
+  send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",clientInfo:{name:"folio-table",version:"1"},appCapabilities:{}}});
+  diag("sent ui/initialize");
 </script>
 </body>
 </html>
