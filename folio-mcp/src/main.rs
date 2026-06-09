@@ -37,7 +37,7 @@ const SERVER_NAME: &str = "folio";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Bump on each diagnostic rebuild so the `version` tool and `serverInfo`
 /// reveal exactly which build a client (e.g. Claude Desktop) is connected to.
-const BUILD_TAG: &str = "2026-06-09-clean";
+const BUILD_TAG: &str = "2026-06-09-batch-decompose";
 
 const WIDGET_TABLE_HTML: &str = include_str!("widgets/table.html");
 const WIDGET_BATCH_HTML: &str = include_str!("widgets/batch.html");
@@ -1068,10 +1068,29 @@ fn tool_eval_batch(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError
     }
 
     let any_error = results.iter().any(|r| r["isError"].as_bool().unwrap_or(false));
+
+    // Markdown fallback so the sweep is visible in clients without MCP Apps
+    // widgets (e.g. Claude Code), mirroring eval's verbatim-text path.
+    let mut summary_md = format!("Evaluated {} variable set(s).\n\n", results.len());
+    if !comparison.is_empty() {
+        let field = compare_field.unwrap_or("value");
+        summary_md.push_str(&format!("| # | variables | {} |\n|---|-----------|--------|\n", field));
+        for c in &comparison {
+            summary_md.push_str(&format!("| {} | {} | {} |\n",
+                c["index"], fmt_obj(&c["variables"]), c["value"].as_str().unwrap_or("")));
+        }
+    } else {
+        summary_md.push_str("| # | variables | values |\n|---|-----------|--------|\n");
+        for r in &results {
+            summary_md.push_str(&format!("| {} | {} | {} |\n",
+                r["index"], fmt_obj(&r["variables"]), fmt_obj(&r["values"])));
+        }
+    }
+
     Ok(json!({
         "content": [{
             "type": "text",
-            "text": format!("Evaluated {} variable set(s).", results.len()),
+            "text": summary_md,
             "annotations": { "audience": ["user"], "priority": 1.0 }
         }],
         "structuredContent": {
@@ -1390,14 +1409,77 @@ fn tool_list_constants(folio: &Folio, _args: JsonValue) -> Result<JsonValue, Mcp
     Ok(json!({ "content": [{ "type": "text", "text": text }], "structuredContent": { "constants": value_to_json(&constants) } }))
 }
 
+/// Format a JSON object {k: v, ...} as "k=v, k2=v2" for markdown summaries.
+fn fmt_obj(v: &JsonValue) -> String {
+    v.as_object()
+        .map(|o| o.iter()
+            .map(|(k, val)| {
+                let vs = val.as_str().map(|s| s.to_string()).unwrap_or_else(|| val.to_string());
+                format!("{}={}", k, vs)
+            })
+            .collect::<Vec<_>>()
+            .join(", "))
+        .unwrap_or_default()
+}
+
+/// Recognize whether a value is a simple expression of φ, π, or e: direct match,
+/// small integer multiples (2π), unit fractions (π/3), small powers (φ^2), 1/K,
+/// and √K — reported when within 0.1% relative error, ranked best-first.
 fn tool_decompose(_folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError> {
     let value_str = args.get("value")
         .and_then(|v| v.as_str())
         .ok_or(McpError { code: -32602, message: "Missing value".to_string(), data: None })?;
 
+    let v: f64 = match value_str.trim().parse::<f64>() {
+        Ok(x) => x,
+        Err(_) => return Ok(json!({
+            "content": [{ "type": "text", "text": format!("`{}` is not a numeric value.", value_str),
+                "annotations": { "audience": ["user"], "priority": 1.0 } }],
+            "structuredContent": { "value": value_str, "matches": [] },
+            "isError": true
+        })),
+    };
+
+    let consts = [("φ", 1.618033988749895_f64), ("π", std::f64::consts::PI), ("e", std::f64::consts::E)];
+    let mut cands: Vec<(String, f64)> = Vec::new();
+    for (name, k) in consts {
+        cands.push((name.to_string(), k));
+        for m in 2..=12 { cands.push((format!("{}{}", m, name), (m as f64) * k)); }
+        for m in 2..=12 { cands.push((format!("{}/{}", name, m), k / (m as f64))); }
+        for n in 2..=4 { cands.push((format!("{}^{}", name, n), k.powi(n))); }
+        cands.push((format!("1/{}", name), 1.0 / k));
+        cands.push((format!("√{}", name), k.sqrt()));
+    }
+
+    let mut matches: Vec<(String, f64, f64)> = Vec::new();
+    if v != 0.0 {
+        for (expr, ev) in &cands {
+            let rel = ((v - ev) / v).abs();
+            if rel < 1e-3 { matches.push((expr.clone(), *ev, rel)); }
+        }
+    }
+    matches.sort_by(|a, b| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal));
+    matches.truncate(5);
+
+    let mut text = format!("## Decompose {}\n\n", value_str);
+    if matches.is_empty() {
+        text.push_str(&format!("No simple φ/π/e pattern found within 0.1% of {}.", value_str));
+    } else {
+        text.push_str("| expression | value | rel. error |\n|------------|-------|------------|\n");
+        for (expr, ev, rel) in &matches {
+            text.push_str(&format!("| {} | {:.10} | {:.2e} |\n", expr, ev, rel));
+        }
+    }
+
+    let matches_json: Vec<JsonValue> = matches.iter().map(|(expr, ev, rel)| json!({
+        "expression": expr,
+        "approx": format!("{:.12}", ev),
+        "relativeError": format!("{:.3e}", rel)
+    })).collect();
+
     Ok(json!({
-        "content": [{ "type": "text", "text": format!("Analysis of {}\n\nPattern detection pending implementation.", value_str) }],
-        "structuredContent": { "value": value_str, "patterns": {}, "note": "DECOMPOSE implementation pending" }
+        "content": [{ "type": "text", "text": text, "annotations": { "audience": ["user"], "priority": 1.0 } }],
+        "structuredContent": { "value": value_str, "matches": matches_json }
     }))
 }
 
@@ -1550,6 +1632,38 @@ mod tests {
         let cmp = res["structuredContent"]["comparison"].as_array().unwrap();
         assert_eq!(cmp.len(), 2);
         assert!(res.get("results").is_none(), "non-standard top-level 'results' must be gone");
+    }
+
+    #[test]
+    fn test_eval_batch_text_has_markdown_table() {
+        let folio = create_folio_with_isis();
+        let args = json!({
+            "template": "## T\n| name | formula | result |\n|------|---------|--------|\n| out | x * 2 | |\n",
+            "variable_sets": [ {"x": "5"}, {"x": "10"} ],
+            "compare_field": "out"
+        });
+        let res = tool_eval_batch(&folio, args).unwrap();
+        let text = res["content"][0]["text"].as_str().unwrap();
+        // Non-widget clients (Claude Code) must see the sweep data as markdown.
+        assert!(text.contains("| # | variables | out |"), "expected comparison table header:\n{}", text);
+        assert!(text.contains("x=5"), "expected variables listed:\n{}", text);
+    }
+
+    #[test]
+    fn test_decompose_recognizes_constants() {
+        let folio = create_folio_with_isis();
+        let exprs = |res: &JsonValue| -> Vec<String> {
+            res["structuredContent"]["matches"].as_array().unwrap().iter()
+                .filter_map(|x| x["expression"].as_str().map(String::from)).collect()
+        };
+        let pi = tool_decompose(&folio, json!({"value": "3.141592653589793"})).unwrap();
+        assert!(exprs(&pi).contains(&"π".to_string()), "π: {:?}", exprs(&pi));
+        let two_pi = tool_decompose(&folio, json!({"value": "6.283185307179586"})).unwrap();
+        assert!(exprs(&two_pi).contains(&"2π".to_string()), "2π: {:?}", exprs(&two_pi));
+        let phi_sq = tool_decompose(&folio, json!({"value": "2.618033988749895"})).unwrap();
+        assert!(exprs(&phi_sq).contains(&"φ^2".to_string()), "φ^2: {:?}", exprs(&phi_sq));
+        let none = tool_decompose(&folio, json!({"value": "42"})).unwrap();
+        assert!(none["structuredContent"]["matches"].as_array().unwrap().is_empty(), "42 should not match");
     }
 
     #[test]
