@@ -871,16 +871,23 @@ fn tool_eval_batch(folio: &Folio, args: JsonValue) -> Result<JsonValue, McpError
             "index": i,
             "variables": vars,
             "values": result.values.iter().map(|(k, v)| (k.clone(), value_to_json(v))).collect::<HashMap<_, _>>(),
-            "has_errors": !result.errors.is_empty()
+            "isError": result.values.values().any(|v| v.is_error())
         }));
     }
 
-    let batch_summary = format!("Evaluated {} variable set(s).", results.len());
-
+    let any_error = results.iter().any(|r| r["isError"].as_bool().unwrap_or(false));
     Ok(json!({
-        "content": [{ "type": "text", "text": batch_summary }],
-        "results": results,
-        "comparison": if compare_field.is_some() { Some(comparison) } else { None }
+        "content": [{
+            "type": "text",
+            "text": format!("Evaluated {} variable set(s).", results.len()),
+            "annotations": { "audience": ["user"], "priority": 1.0 }
+        }],
+        "structuredContent": {
+            "runs": results,
+            "comparison": comparison,
+            "compareField": compare_field
+        },
+        "isError": any_error
     }))
 }
 
@@ -1290,5 +1297,22 @@ mod tests {
         let errs = res["structuredContent"]["errors"].as_array().unwrap();
         assert!(!errs.is_empty(), "div-by-zero must populate structured errors");
         assert_eq!(errs[0]["cell"], "x");
+    }
+
+    #[test]
+    fn test_eval_batch_structured_content() {
+        let folio = create_folio_with_isis();
+        let args = json!({
+            "template": "## T\n| name | formula | result |\n|------|---------|--------|\n| out | x * 2 | |\n",
+            "variable_sets": [ {"x": "5"}, {"x": "10"} ],
+            "compare_field": "out"
+        });
+        let res = tool_eval_batch(&folio, args).unwrap();
+        let runs = res["structuredContent"]["runs"].as_array().unwrap();
+        assert_eq!(runs.len(), 2);
+        assert_eq!(runs[0]["index"], 0);
+        let cmp = res["structuredContent"]["comparison"].as_array().unwrap();
+        assert_eq!(cmp.len(), 2);
+        assert!(res.get("results").is_none(), "non-standard top-level 'results' must be gone");
     }
 }
