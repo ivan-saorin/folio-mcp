@@ -889,10 +889,15 @@ fn handle_tool_call(folio: &Folio, params: &Option<JsonValue>) -> Result<JsonVal
 
 /// Build a spec-compliant CallToolResult for a single-document evaluation.
 fn eval_result_json(result: &folio::EvalResult) -> JsonValue {
-    let errors: Vec<JsonValue> = result.values.iter()
-        .filter_map(|(name, v)| {
-            if let Value::Error(e) = v {
-                Some(json!({ "code": e.code, "message": e.message, "cell": name }))
+    // Derive errors in document order from the ordered `cells`, looking up each
+    // error cell's `Value::Error` for its code/message. Iterating the ordered
+    // cells rather than the `values` HashMap keeps the output deterministic
+    // (same input => same output), even with multiple error cells.
+    let errors: Vec<JsonValue> = result.cells.iter()
+        .filter(|c| c.is_error)
+        .filter_map(|c| {
+            if let Some(Value::Error(e)) = result.values.get(&c.name) {
+                Some(json!({ "code": e.code, "message": e.message, "cell": c.name }))
             } else {
                 None
             }
@@ -1457,6 +1462,19 @@ mod tests {
         let errs = res["structuredContent"]["errors"].as_array().unwrap();
         assert!(!errs.is_empty(), "div-by-zero must populate structured errors");
         assert_eq!(errs[0]["cell"], "x");
+    }
+
+    #[test]
+    fn test_eval_errors_are_document_ordered() {
+        // Two error cells: the errors array must be in document order (a then b),
+        // deterministically — not in HashMap-iteration order.
+        let folio = create_folio_with_isis();
+        let doc = "## T\n| name | formula | result |\n|------|---------|--------|\n| a | 1 / 0 | |\n| b | 2 / 0 | |\n";
+        let res = tool_eval(&folio, eval_args(doc)).unwrap();
+        let errs = res["structuredContent"]["errors"].as_array().unwrap();
+        assert_eq!(errs.len(), 2);
+        assert_eq!(errs[0]["cell"], "a");
+        assert_eq!(errs[1]["cell"], "b");
     }
 
     #[test]
