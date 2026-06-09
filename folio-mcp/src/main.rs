@@ -447,10 +447,7 @@ fn handle_initialize(params: &Option<JsonValue>) -> Result<JsonValue, McpError> 
 }
 
 fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
-    // Used in a later task to conditionally attach UI linkage; referenced here
-    // to silence the unused-variable warning without renaming the parameter.
-    let _ = client_ui_support;
-    Ok(json!({
+    let mut value = json!({
         "tools": [
             {
                 "name": "eval",
@@ -653,7 +650,22 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
                 }
             }
         ]
-    }))
+    });
+    if client_ui_support {
+        if let Some(arr) = value["tools"].as_array_mut() {
+            for t in arr.iter_mut() {
+                let uri = match t["name"].as_str() {
+                    Some("eval") | Some("eval_file") => Some("ui://folio/table"),
+                    Some("eval_batch") => Some("ui://folio/batch"),
+                    _ => None,
+                };
+                if let Some(uri) = uri {
+                    t["_meta"] = json!({ "ui": { "resourceUri": uri, "visibility": ["model","app"] } });
+                }
+            }
+        }
+    }
+    Ok(value)
 }
 
 fn handle_resources_list() -> Result<JsonValue, McpError> {
@@ -1381,6 +1393,19 @@ mod tests {
         assert!(!detect_ui_support(&None));
         let no = Some(json!({ "capabilities": {} }));
         assert!(!detect_ui_support(&no));
+    }
+
+    #[test]
+    fn test_ui_meta_linkage_is_conditional() {
+        let off = handle_tools_list(false).unwrap();
+        let eval_off = off["tools"].as_array().unwrap().iter().find(|t| t["name"]=="eval").unwrap();
+        assert!(eval_off.get("_meta").is_none());
+
+        let on = handle_tools_list(true).unwrap();
+        let eval_on = on["tools"].as_array().unwrap().iter().find(|t| t["name"]=="eval").unwrap();
+        assert_eq!(eval_on["_meta"]["ui"]["resourceUri"], "ui://folio/table");
+        let batch_on = on["tools"].as_array().unwrap().iter().find(|t| t["name"]=="eval_batch").unwrap();
+        assert_eq!(batch_on["_meta"]["ui"]["resourceUri"], "ui://folio/batch");
     }
 
     #[test]
