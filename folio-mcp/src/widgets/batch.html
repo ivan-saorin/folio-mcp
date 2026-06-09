@@ -21,14 +21,13 @@
   function kv(o){return Object.keys(o||{}).map(function(k){return esc(k)+"="+esc(o[k]);}).join(", ");}
   function diag(s){var d=document.getElementById("diag");if(d){d.textContent+=(d.textContent?" · ":"")+s;}}
   function send(msg){window.parent.postMessage(msg,"*");}
-  // Flexible-dimension Views MUST report their content size or the host leaves
-  // the iframe at ~zero height (invisible). Report on load, after render, and
-  // on any layout change via ResizeObserver (per SEP-1865).
   function reportSize(){
     var h=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight,1);
     var w=Math.max(document.body.scrollWidth,document.documentElement.scrollWidth,1);
     send({jsonrpc:"2.0",method:"ui/notifications/size-changed",params:{width:w,height:h}});
   }
+  var ready=false;
+  function announceReady(){ if(ready) return; ready=true; send({jsonrpc:"2.0",method:"ui/notifications/initialized"}); reportSize(); }
   function render(sc){
     var root=document.getElementById("root");
     if(!sc||!Array.isArray(sc.runs)){root.innerHTML='<div class="empty">No runs to display.</div>';reportSize();return;}
@@ -47,14 +46,21 @@
   }
   window.addEventListener("message",function(ev){
     var m=ev.data||{};
-    diag(m.method||((m.id===1&&m.result)?"init-result":"msg"));
-    if(m.id===1&&m.result){send({jsonrpc:"2.0",method:"ui/notifications/initialized"});reportSize();return;}
-    if(m.method==="ui/notifications/tool-result"&&m.params){render(m.params.structuredContent);}
+    if(m && m.result!==undefined && m.method===undefined){ diag("init-result"); announceReady(); return; }
+    var meth=(m&&m.method)||"";
+    diag(meth||"msg");
+    if((meth==="ui/notifications/tool-result"||meth.indexOf("tool-result")>=0)&&m.params){
+      var p=m.params;
+      var sc=p.structuredContent||(p.result&&p.result.structuredContent)||(p.toolResult&&p.toolResult.structuredContent)||p;
+      diag("runs="+((sc&&sc.runs)?sc.runs.length:"?"));
+      render(sc);
+    }
   });
   send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",clientInfo:{name:"folio-batch",version:"1"},appCapabilities:{}}});
   diag("sent ui/initialize");
   try{ new ResizeObserver(function(){reportSize();}).observe(document.body); }catch(e){}
   reportSize();
+  setTimeout(announceReady,1000);
 </script>
 </body>
 </html>
