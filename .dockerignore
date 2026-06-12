@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+**/target/
+
+# Data (mounted at runtime)
+data/
+
+# Git / IDE / OS
+.git/
+.gitignore
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docs / specs / examples (not needed for build)
+imgs/
+specs/
+examples/
+README.md
+PLAN-*.md
+tmp.md
+mcp-config.example.json
+docker-compose.yml
+
+# Claude / tooling
+.claude/
