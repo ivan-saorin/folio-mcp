@@ -10,6 +10,7 @@
   th, td { text-align: left; padding: 4px 10px; border-bottom: 1px solid rgba(128,128,128,.25); vertical-align: top; }
   th { font: 600 12px/1.4 system-ui, sans-serif; opacity: .7; }
   .empty { opacity: .55; padding: 12px; }
+  pre { white-space: pre-wrap; margin: 0; }
 </style>
 </head>
 <body>
@@ -41,17 +42,38 @@
     root.innerHTML=html;
     reportSize();
   }
+  // First "text" content item of the CallToolResult (the markdown summary).
+  function extractMarkdown(p){
+    var lists=[p.content,p.result&&p.result.content,p.toolResult&&p.toolResult.content];
+    for(var i=0;i<lists.length;i++){
+      var c=lists[i];
+      if(Array.isArray(c)){
+        for(var j=0;j<c.length;j++){ if(c[j]&&c[j].type==="text"&&typeof c[j].text==="string") return c[j].text; }
+      }
+    }
+    return "";
+  }
   window.addEventListener("message",function(ev){
     var m=ev.data||{};
-    if(m && m.result!==undefined && m.method===undefined){ announceReady(); return; }
+    // The only request we send is ui/initialize, so any JSON-RPC response —
+    // result OR error — means the host answered -> announce readiness.
+    if(m && m.method===undefined && (m.result!==undefined||m.error!==undefined)){ announceReady(); return; }
     var meth=(m&&m.method)||"";
     if((meth==="ui/notifications/tool-result"||meth.indexOf("tool-result")>=0)&&m.params){
       var p=m.params;
       var sc=p.structuredContent||(p.result&&p.result.structuredContent)||(p.toolResult&&p.toolResult.structuredContent)||p;
+      // Fallback when the host strips structuredContent: show the markdown
+      // summary verbatim rather than the empty state.
+      if(!sc||!Array.isArray(sc.runs)){
+        var md=extractMarkdown(p);
+        if(md){document.getElementById("root").innerHTML="<pre>"+esc(md)+"</pre>";reportSize();return;}
+      }
       render(sc);
     }
   });
-  send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",clientInfo:{name:"folio-batch",version:"1"},appCapabilities:{}}});
+  // MCP Apps handshake (SEP-1865 2026-01-26): apps identify with appInfo (the
+  // clientInfo shape is schema-invalid and rejected by Claude web/Desktop).
+  send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",appInfo:{name:"folio-batch",version:"1"},appCapabilities:{}}});
   try{ new ResizeObserver(function(){reportSize();}).observe(document.body); }catch(e){}
   reportSize();
   setTimeout(announceReady,1000);

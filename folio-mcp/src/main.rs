@@ -3,8 +3,12 @@
 //! MCP Server implementing spec 2025-11-25, with the MCP Apps (SEP-1865)
 //! `io.modelcontextprotocol/ui` extension for verbatim, in-conversation
 //! rendering of computation tables. Tool results carry `structuredContent`
-//! (+ `outputSchema`); UI-capable hosts render the table widget, others fall
+//! (no `outputSchema` is declared for the eval tools: hosts MAY validate
+//! structuredContent against it and silently strip it on any mismatch, which
+//! blanks the widget); UI-capable hosts render the table widget, others fall
 //! back to the markdown in the text content.
+//! Set `FOLIO_NO_WIDGET=1` to omit the tool->widget linkage entirely so hosts
+//! render the markdown text in chat instead of mounting a widget.
 //!
 //! Tools:
 //! - eval: Evaluate a document template (MCP App: ui://folio/table)
@@ -37,7 +41,7 @@ const SERVER_NAME: &str = "folio";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Bump on each diagnostic rebuild so the `version` tool and `serverInfo`
 /// reveal exactly which build a client (e.g. Claude Desktop) is connected to.
-const BUILD_TAG: &str = "2026-06-09-batch-decompose";
+const BUILD_TAG: &str = "2026-07-22-apps-spec-fallback";
 
 const WIDGET_TABLE_HTML: &str = include_str!("widgets/table.html");
 const WIDGET_BATCH_HTML: &str = include_str!("widgets/batch.html");
@@ -407,6 +411,16 @@ fn handle_request(folio: &Folio, request: &McpRequest, client_ui_support: &mut b
     }
 }
 
+/// Kill-switch: with FOLIO_NO_WIDGET=1 (or "true"), tools/list omits the
+/// `_meta.ui` linkage so hosts show the markdown text in chat instead of
+/// mounting a widget. The ui:// resources stay registered; only the tool
+/// linkage decides whether a widget mounts.
+fn widget_disabled() -> bool {
+    env::var("FOLIO_NO_WIDGET")
+        .map(|v| { let v = v.trim().to_ascii_lowercase(); v == "1" || v == "true" })
+        .unwrap_or(false)
+}
+
 /// True if the client declared support for the MCP Apps UI extension.
 fn detect_ui_support(params: &Option<JsonValue>) -> bool {
     params.as_ref()
@@ -465,23 +479,6 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
                 "title": "Evaluate Folio Document",
                 "description": "Evaluate a Folio markdown document with formulas. Returns a complete, auditable results table (one row per named cell) designed to be shown to the user in full; do not summarize, truncate, or paraphrase it.",
                 "annotations": { "readOnlyHint": true, "openWorldHint": false },
-                "outputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "cells": { "type": "array", "items": { "type": "object",
-                            "properties": {
-                                "name": {"type":"string"}, "formula": {"type":"string"},
-                                "result": {"type":"string"}, "isError": {"type":"boolean"},
-                                "section": {"type":"string"}
-                            },
-                            "required": ["name","formula","result"] } },
-                        "markdown": { "type": "string" },
-                        "errors": { "type": "array", "items": { "type": "object",
-                            "properties": { "code":{"type":"string"}, "message":{"type":"string"}, "cell":{"type":"string"} } } },
-                        "isError": { "type": "boolean" }
-                    },
-                    "required": ["cells"]
-                },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -508,23 +505,6 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
                 "title": "Evaluate Folio File",
                 "description": "Evaluate a .fmd file from the data directory by name. Returns a complete, auditable results table designed to be shown to the user in full; do not summarize, truncate, or paraphrase it.",
                 "annotations": { "readOnlyHint": true, "openWorldHint": false },
-                "outputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "cells": { "type": "array", "items": { "type": "object",
-                            "properties": {
-                                "name": {"type":"string"}, "formula": {"type":"string"},
-                                "result": {"type":"string"}, "isError": {"type":"boolean"},
-                                "section": {"type":"string"}
-                            },
-                            "required": ["name","formula","result"] } },
-                        "markdown": { "type": "string" },
-                        "errors": { "type": "array", "items": { "type": "object",
-                            "properties": { "code":{"type":"string"}, "message":{"type":"string"}, "cell":{"type":"string"} } } },
-                        "isError": { "type": "boolean" }
-                    },
-                    "required": ["cells"]
-                },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -550,18 +530,6 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
                 "title": "Folio Parameter Sweep",
                 "description": "Evaluate a template with multiple variable sets for parameter sweeps.",
                 "annotations": { "readOnlyHint": true, "openWorldHint": false },
-                "outputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "runs": { "type": "array", "items": { "type": "object",
-                            "properties": { "index":{"type":"integer"}, "variables":{"type":"object"},
-                                "values":{"type":"object"}, "isError":{"type":"boolean"} },
-                            "required": ["index","values"] } },
-                        "comparison": { "type": "array" },
-                        "compareField": { "type": ["string","null"] }
-                    },
-                    "required": ["runs"]
-                },
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -689,7 +657,11 @@ fn handle_tools_list(client_ui_support: bool) -> Result<JsonValue, McpError> {
         }
     }
 
-    if client_ui_support {
+    // Nested `_meta.ui.resourceUri` is the SEP-1865 stable form (the flat
+    // `_meta["ui/resourceUri"]` key is deprecated). No linkage at all when the
+    // FOLIO_NO_WIDGET kill-switch is set: the host then renders the markdown
+    // text content in chat.
+    if client_ui_support && !widget_disabled() {
         if let Some(arr) = value["tools"].as_array_mut() {
             for t in arr.iter_mut() {
                 let uri = match t["name"].as_str() {
@@ -1697,7 +1669,9 @@ mod tests {
             assert_eq!(t["annotations"]["openWorldHint"], false, "{} openWorldHint", t["name"]);
         }
         let eval = tools.iter().find(|t| t["name"] == "eval").unwrap();
-        assert!(eval["outputSchema"]["properties"]["cells"].is_object());
+        // No outputSchema on the eval tools: hosts MAY validate structuredContent
+        // against a declared schema and strip it on mismatch, blanking the widget.
+        assert!(eval.get("outputSchema").is_none(), "eval must not declare outputSchema");
         // No UI linkage when the client does not support the extension.
         assert!(eval.get("_meta").is_none());
     }

@@ -47,21 +47,58 @@
     root.innerHTML=html;
     reportSize();
   }
+  // First "text" content item of the CallToolResult (the markdown table).
+  function extractMarkdown(p){
+    var lists=[p.content,p.result&&p.result.content,p.toolResult&&p.toolResult.content];
+    for(var i=0;i<lists.length;i++){
+      var c=lists[i];
+      if(Array.isArray(c)){
+        for(var j=0;j<c.length;j++){ if(c[j]&&c[j].type==="text"&&typeof c[j].text==="string") return c[j].text; }
+      }
+    }
+    return "";
+  }
+  // Fallback when the host strips structuredContent: rebuild cells from the
+  // markdown. Sections are "## Heading" lines (attribute suffixes like
+  // "@precision:50" stripped); each table's first row is the header, "|---|"
+  // rows are separators; error cells render as "#ERROR: <code>".
+  function parseMarkdownCells(md){
+    var cells=[],section="",inTable=false,row=0;
+    String(md||"").split(/\r?\n/).forEach(function(line){
+      var t=line.trim();
+      if(/^#+\s/.test(t)){section=t.replace(/^#+\s*/,"").split(" @")[0].trim();inTable=false;return;}
+      if(t.charAt(0)!=="|"){inTable=false;return;}
+      if(!inTable){inTable=true;row=0;}
+      row++;
+      if(row===1)return;
+      var parts=t.split("|").slice(1,-1).map(function(x){return x.trim();});
+      if(parts.length<2)return;
+      if(parts.every(function(x){return /^:?-+:?$/.test(x);}))return;
+      var name=parts[0],formula=parts.length>=3?parts[1]:"",result=parts[parts.length-1];
+      if(!name&&!formula&&!result)return;
+      cells.push({name:name,formula:formula,result:result,section:section,isError:result.indexOf("#ERROR")===0});
+    });
+    return cells;
+  }
   window.addEventListener("message",function(ev){
     var m=ev.data||{};
-    // The only request we send is ui/initialize, so any JSON-RPC response is its
-    // answer -> announce readiness.
-    if(m && m.result!==undefined && m.method===undefined){ announceReady(); return; }
+    // The only request we send is ui/initialize, so any JSON-RPC response —
+    // result OR error — means the host answered -> announce readiness.
+    if(m && m.method===undefined && (m.result!==undefined||m.error!==undefined)){ announceReady(); return; }
     var meth=(m&&m.method)||"";
     if((meth==="ui/notifications/tool-result"||meth.indexOf("tool-result")>=0)&&m.params){
       var p=m.params;
       var sc=p.structuredContent||(p.result&&p.result.structuredContent)||(p.toolResult&&p.toolResult.structuredContent)||p;
+      if(!sc||!Array.isArray(sc.cells)||sc.cells.length===0){
+        var parsed=parseMarkdownCells(extractMarkdown(p));
+        if(parsed.length){render({cells:parsed});return;}
+      }
       render(sc);
     }
   });
-  // MCP Apps handshake: initialize, then announce readiness (with a fallback in
-  // case the host's initialize response isn't a detectable JSON-RPC result).
-  send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",clientInfo:{name:"folio-table",version:"1"},appCapabilities:{}}});
+  // MCP Apps handshake (SEP-1865 2026-01-26): apps identify with appInfo (the
+  // clientInfo shape is schema-invalid and rejected by Claude web/Desktop).
+  send({jsonrpc:"2.0",id:1,method:"ui/initialize",params:{protocolVersion:"2026-01-26",appInfo:{name:"folio-table",version:"1"},appCapabilities:{}}});
   try{ new ResizeObserver(function(){reportSize();}).observe(document.body); }catch(e){}
   reportSize();
   setTimeout(announceReady,1000);

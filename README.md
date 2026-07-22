@@ -263,6 +263,8 @@ Add to your Claude Desktop configuration:
 }
 ```
 
+Set `FOLIO_NO_WIDGET=1` in `env` to disable the MCP Apps result widgets; eval results are then shown as plain markdown tables in chat.
+
 ## Examples
 
 See `data/examples/` for sample .fmd files:
