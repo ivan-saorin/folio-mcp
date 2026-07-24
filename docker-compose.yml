@@ -11,3 +11,17 @@ services:
     volumes:
       - ./data:/app/folio:ro
     # No ports needed - MCP uses stdio
+
+  folio-httpd:
+    build:
+      context: .
+      dockerfile: Dockerfile.httpd
+    container_name: folio-httpd
+    environment:
+      - FOLIO_DATA_PATH=/app/folio
+      - RUST_LOG=info
+      # - FOLIO_BEARER=...   # optional app-side bearer; unset = edge-only auth
+    volumes:
+      - ./data:/app/folio:ro
+    ports:
+      - "8080:8080"

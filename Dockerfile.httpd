@@ -1,0 +1,38 @@
+# folio-httpd — HTTP JSON API for the automa stack (searxng-style resident app)
+# Build stage
+FROM rust:1.83-slim-bookworm AS builder
+
+WORKDIR /app
+
+# Copy workspace
+COPY . .
+
+# Build release (increase stack size to prevent SIGSEGV in rustc)
+ENV RUST_MIN_STACK=16777216
+RUN cargo build --release -p folio-httpd
+
+# Runtime stage
+FROM debian:bookworm-slim
+
+# curl for the container healthcheck
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=builder /app/target/release/folio-httpd /usr/local/bin/folio-httpd
+
+RUN mkdir -p /app/folio
+
+ENV FOLIO_DATA_PATH=/app/folio
+ENV FOLIO_HTTP_ADDR=0.0.0.0:8080
+ENV RUST_LOG=info
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl -fsS http://localhost:8080/healthz || exit 1
+
+ENTRYPOINT ["/usr/local/bin/folio-httpd"]

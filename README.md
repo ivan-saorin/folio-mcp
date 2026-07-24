@@ -95,7 +95,8 @@ Extend with custom functions via `FunctionPlugin`, `AnalyzerPlugin`, `CommandPlu
 | `folio-units` | Units: physical unit conversions with dimensional analysis |
 | `folio-kitchen` | Kitchen: recipe scaling, cups↔grams, altitude/convection adjustments |
 | `folio` | Parser, evaluator, renderer |
-| `folio-mcp` | MCP server exposing tools for Claude Desktop |
+| `folio-mcp` | Service layer (lib) + MCP stdio server for Claude Desktop (bin) |
+| `folio-httpd` | HTTP JSON API over the same service layer — resident app for the automa stack |
 
 ## Function Categories
 
@@ -179,6 +180,32 @@ eval_file("data/examples/mortgage")  # Won't work - no paths
 ```
 
 Files are loaded from the `FOLIO_DATA_PATH` directory (default: `/app/folio` in Docker).
+
+### As HTTP API (automa stack)
+
+`folio-httpd` exposes the same tool surface as JSON over HTTP — a searxng-style
+resident service (TLS + stack bearer terminate at the edge):
+
+```bash
+cargo run -p folio-httpd                      # or: docker build -f Dockerfile.httpd .
+```
+
+| Endpoint | Body / params | Returns |
+|----------|---------------|---------|
+| `GET /healthz` | — | `{status, name, version}` (unauthenticated) |
+| `POST /eval` | `{template, variables?}` | `{markdown, cells[], errors[], isError}` |
+| `POST /eval_file` | `{name, variables?}` | same + `sourceFile` |
+| `POST /eval_batch` | `{template, variable_sets, compare_field?}` | `{markdown, runs[], comparison[]}` |
+| `GET /docs?name=&compact=1` | — | documentation (the `folio` tool) |
+| `GET /quick` | — | compact quick reference |
+| `GET /functions?category=` | — | function list |
+| `GET /constants` | — | constants with sources |
+| `GET\|POST /decompose?value=` | — | φ/π/e pattern analysis |
+| `GET /files` | — | available `.fmd` documents |
+
+Env: `FOLIO_HTTP_ADDR` (default `0.0.0.0:8080`), `FOLIO_DATA_PATH`,
+`FOLIO_BEARER` (optional app-side `Authorization: Bearer` check; unset =
+edge-only auth).
 
 ### As Library
 
