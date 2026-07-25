@@ -1,0 +1,10 @@
+# MGR manifest (§7.8): this repo declares its own resident app. MGR reads
+# [app] from master on the jobs refresh cycle, builds Dockerfile.httpd at the
+# declared sha, and runs it as container 'folio-httpd' on mgr-net — Caddy's
+# static rule (folio.$DOMAIN -> folio-httpd:8080) resolves it via docker DNS.
+# Runtime env (RUST_LOG, FOLIO_*) is baked into the Dockerfile: the repo is
+# the filesystem, there is no [files] for repo apps.
+
+[app]
+name = "folio-httpd"
+dockerfile = "Dockerfile.httpd"
