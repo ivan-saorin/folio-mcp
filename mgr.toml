@@ -1,10 +1,5 @@
-# MGR manifest (§7.8): this repo declares its own resident app. MGR reads
-# [app] from master on the jobs refresh cycle, builds Dockerfile.httpd at the
-# declared sha, and runs it as container 'folio-httpd' on mgr-net — Caddy's
-# static rule (folio.$DOMAIN -> folio-httpd:8080) resolves it via docker DNS.
-# Runtime env (RUST_LOG, FOLIO_*) is baked into the Dockerfile: the repo is
-# the filesystem, there is no [files] for repo apps.
-
-[app]
-name = "folio-httpd"
-dockerfile = "Dockerfile.httpd"
+# MGR workload manifest (v1). [app] moved to sigiled.toml (v2 cutover,
+# same handoff as reddit-mine and tomes-and-tales): the v2 engine reads
+# sigiled.toml first, and removing it here deregisters the app from v1
+# (container left as-is — no downtime). v1 keeps driving sessions from
+# this file until the switch.

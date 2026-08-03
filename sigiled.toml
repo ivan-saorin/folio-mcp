@@ -1,0 +1,16 @@
+# SIGILED v2 workload manifest — schema: docs/sigiled-contract.md in
+# ivan-saorin/sigiled. This file owns the [app]; mgr.toml stays for the v1
+# engine until the switch. Third app migrated under the decree (after
+# reddit-mine and tomes-and-tales): no v1 auto-conversion, one migration
+# per session.
+
+# Resident service: sigiled builds Dockerfile.httpd from this repo at
+# master ({name}:{sha12}) and runs container `folio-httpd` on the stack
+# network — Caddy's static rule (folio.{DOMAIN} -> folio-httpd:8080)
+# resolves it via docker DNS, bearer checked at the edge only. Runtime env
+# (RUST_LOG, FOLIO_*) is baked into the Dockerfile: the repo is the
+# filesystem. No volumes, no secrets. Deploy = the upgrade verb; start
+# never recreates.
+[app]
+name = "folio-httpd"
+dockerfile = "Dockerfile.httpd"
